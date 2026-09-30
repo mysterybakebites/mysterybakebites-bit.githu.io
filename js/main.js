@@ -46,28 +46,31 @@ if ('IntersectionObserver' in window) {
 }
 
 var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-// Review carousel control: preserves its left-to-right movement and offers an explicit pause.
-(function () {
-  var carousel = document.querySelector('.t-carousel');
-  var control = document.getElementById('reviewsMotionToggle');
-  if (!carousel || !control) return;
-  if (reduce) { control.hidden = true; return; }
-  control.addEventListener('click', function () {
-    var paused = carousel.classList.toggle('is-paused');
-    carousel.classList.toggle('is-playing', !paused);
-    control.setAttribute('aria-pressed', paused ? 'true' : 'false');
-    control.textContent = paused ? 'Resume reviews' : 'Pause reviews';
-  });
-})();
 
+// Keep scroll work inside animation frames so rapid wheel/touch input never
+// forces repeated style and layout work on the browser's scroll thread.
+function rafThrottle(fn) {
+  var ticking = false;
+  return function () {
+    if (ticking) return;
+    ticking = true;
+    var run = function () { ticking = false; fn(); };
+    if ('requestAnimationFrame' in window) requestAnimationFrame(run);
+    else setTimeout(run, 16);
+  };
+}
 
 // Stagger reveals among siblings + directional variants
-document.querySelectorAll('.menu-grid, .insta-grid, .steps, .pl-grid, .svc-grid, .info-grid, .pay-grid, .g-grid, .stage-grid, .guide-grid, .cd-facts, .bundle-grid, .level-list, .rgrid, .sgrid, .dgrid').forEach(function (g) {
+document.querySelectorAll('.menu-grid, .insta-grid, .steps, .pl-grid, .svc-grid, .info-grid, .pay-grid, .g-grid, .class-choice-grid, .guide-grid, .cd-facts, .bundle-grid, .level-list, .rgrid, .sgrid, .dgrid').forEach(function (g) {
   Array.prototype.forEach.call(g.querySelectorAll('.reveal'), function (el, i) {
     el.style.setProperty('--d', (i % 4) * 0.1 + 's');
   });
 });
 document.querySelectorAll('.insta-grid .reveal').forEach(function (el) { el.classList.add('zoom'); });
+// Page-purpose motion: stagger menu cards and order-builder steps without adding markup.
+document.querySelectorAll('.pricelist .pl-card, .menu-guide-grid .menu-guide-card, .op-form .op-step, .ocats .ocat').forEach(function (el, i) {
+  el.style.setProperty('--d', (i % 5) * 0.08 + 's');
+});
 var sp = document.querySelector('.story-photo'); if (sp) sp.classList.add('from-left');
 var sc = document.querySelector('.story-grid > div:last-child'); if (sc) sc.classList.add('from-right');
 
@@ -75,13 +78,19 @@ var sc = document.querySelector('.story-grid > div:last-child'); if (sc) sc.clas
 var bar = document.createElement('div'); bar.className = 'progress'; document.body.appendChild(bar);
 var header = document.querySelector('.site-header');
 var frame = document.querySelector('.hero-frame');
+var headerScrolled = false;
 function onScroll() {
   var y = window.scrollY, h = document.documentElement.scrollHeight - innerHeight;
   bar.style.transform = 'scaleX(' + (h > 0 ? y / h : 0) + ')';
-  if (header) header.classList.toggle('scrolled', y > 30);
+  var nextHeaderState = y > 30;
+  if (header && nextHeaderState !== headerScrolled) {
+    header.classList.toggle('scrolled', nextHeaderState);
+    headerScrolled = nextHeaderState;
+  }
   if (frame && !reduce && y < 900) frame.style.transform = 'rotate(-1.6deg) translateY(' + (y * -0.08) + 'px)';
 }
-addEventListener('scroll', onScroll, { passive: true }); onScroll();
+var scheduleScrollChrome = rafThrottle(onScroll);
+addEventListener('scroll', scheduleScrollChrome, { passive: true }); onScroll();
 
 var desktop = window.matchMedia('(min-width: 769px)').matches;
 if (!reduce && desktop) {
@@ -166,8 +175,12 @@ document.querySelectorAll('.book-form').forEach(function (f) {
     var sub = chosen.reduce(function (t, b) { return t + (+b.dataset.fee); }, 0);
     var pct = chosen.length >= 3 ? d3 : chosen.length === 2 ? d2 : 0;
     var n = +seats.value, disc = sub * pct / 100, tot = (sub - disc) * n;
-    q('.sub').textContent = fmt(sub); q('.disc').textContent = fmt(disc); q('.disc-pct').textContent = pct;
-    q('.disc-row').hidden = !pct; q('.n').textContent = n; q('.tot').textContent = fmt(tot);
+    q('.sub').textContent = fmt(sub);
+    var discEl = q('.disc'), discPctEl = q('.disc-pct');
+    if (discEl) discEl.textContent = fmt(disc);
+    if (discPctEl) discPctEl.textContent = pct;
+    var discRow = q('.disc-row'); if (discRow) discRow.hidden = !pct;
+    q('.n').textContent = n; q('.tot').textContent = fmt(tot);
     state = { chosen: chosen, sub: sub, pct: pct, disc: disc, n: n, tot: tot };
   }
   boxes.forEach(function (b) { b.addEventListener('change', calc); });
@@ -175,18 +188,16 @@ document.querySelectorAll('.book-form').forEach(function (f) {
   f.addEventListener('submit', function (e) {
     e.preventDefault();
     var g = function (n) { var el = f.querySelector('[name=' + n + ']'); return el ? el.value.trim() : ''; };
-    var sch = f.querySelector('[name=schedule]:checked');
+    var sch = f.querySelector('[name=schedule]:checked') || f.querySelector('[name=schedule]');
     var list = state.chosen.map(function (b) { return '   - ' + b.dataset.name + ' (GH₵ ' + fmt(+b.dataset.fee) + ')'; }).join('\n');
-    var provisional = track === 'pastry';
-    var intent = provisional ? "I'd like to enquire about the pastry classes below" : "I'd like to book the bread classes below";
-    var priceNote = provisional ? '\n\nPlease confirm the current pastry recipes, final fee and available dates before booking.' : '';
+    var intent = track === 'pastry' ? "I'd like to book the pastry classes below" : "I'd like to book the bread classes below";
     var msg = "Hello Mystery Bakebite! 👩🏾‍🍳 " + intent + ".\n\n" +
       '• Class' + (state.chosen.length > 1 ? 'es' : '') + ' (1 week each):\n' + list + '\n' +
-      (state.pct ? '• ' + (provisional ? 'Indicative bundle discount: ' : 'Bundle discount: ') + state.pct + '% (− GH₵ ' + fmt(state.disc) + ' per student)\n' : '') +
-      '• Preferred schedule: ' + (sch ? sch.value : '') + '\n' +
+      (state.pct ? '• Bundle discount: ' + state.pct + '% (− GH₵ ' + fmt(state.disc) + ' per student)\n' : '') +
+      '• Recommended daily time: ' + (sch ? sch.value : '') + '\n' +
       '• Preferred start date: ' + (g('date') || 'Flexible') + '\n' +
       '• Number of students: ' + state.n + '\n' +
-      '• ' + (provisional ? 'Indicative estimated total: ' : 'Estimated total: ') + 'GH₵ ' + fmt(state.tot) + priceNote + '\n\n' +
+      '• Estimated total: GH₵ ' + fmt(state.tot) + '\n\n' +
       'Name: ' + g('name') + '\nPhone: ' + g('phone');
     window.open('https://wa.me/233554520532?text=' + encodeURIComponent(msg), '_blank', 'noopener');
   });
@@ -211,14 +222,51 @@ document.querySelectorAll('.book-form').forEach(function (f) {
   f.addEventListener('change', function () { t.classList.remove('bump'); void t.offsetWidth; t.classList.add('bump'); });
 });
 
-// Class page sub-nav: highlight current section
+// Class page sub-nav: reliable anchor scrolling, active state, and horizontal reveal
 (function () {
-  var links = document.querySelectorAll('.subnav a:not(.sn-book)'); if (!links.length || !('IntersectionObserver' in window)) return;
-  var map = {}; links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
-  var io = new IntersectionObserver(function (es) {
-    es.forEach(function (e) { if (e.isIntersecting) { links.forEach(function (l) { l.classList.remove('active'); }); var l = map[e.target.id]; if (l) { l.classList.add('active'); l.scrollIntoView({ block: 'nearest', inline: 'center' }); } } });
-  }, { rootMargin: '-45% 0px -50% 0px' });
-  Object.keys(map).forEach(function (id) { var el = document.getElementById(id); if (el) io.observe(el); });
+  var allLinks = document.querySelectorAll('.subnav a[href^="#"]');
+  if (!allLinks.length) return;
+  var links = document.querySelectorAll('.subnav a:not(.sn-book)');
+  var navInner = document.querySelector('.subnav .sn-inner');
+  var map = {};
+
+  function revealLink(link) {
+    if (!navInner || navInner.scrollWidth <= navInner.clientWidth) return;
+    var lr = link.getBoundingClientRect(), nr = navInner.getBoundingClientRect();
+    if (lr.left < nr.left + 10 || lr.right > nr.right - 10) {
+      navInner.scrollTo({ left: navInner.scrollLeft + (lr.left - nr.left) - 24, behavior: reduce ? 'auto' : 'smooth' });
+    }
+  }
+  function setActive(id) {
+    links.forEach(function (link) { link.classList.toggle('active', link === map[id]); });
+    if (map[id]) revealLink(map[id]);
+  }
+
+  // Do not rely on the browser's default anchor calculation under the sticky
+  // header and sub-navigation. The target sections already define the correct
+  // scroll margin, so this keeps every click aligned below both bars.
+  allLinks.forEach(function (link) {
+    link.addEventListener('click', function (event) {
+      var id = (link.getAttribute('href') || '').slice(1), target = id && document.getElementById(id);
+      if (!target) return;
+      event.preventDefault();
+      target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start', inline: 'nearest' });
+      try { history.replaceState(null, '', '#' + id); } catch (ignore) {}
+      if (map[id]) setActive(id);
+    });
+  });
+
+  links.forEach(function (link) { map[link.getAttribute('href').slice(1)] = link; });
+  if (!('IntersectionObserver' in window)) { setActive('overview'); return; }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting && map[entry.target.id]) setActive(entry.target.id);
+    });
+  }, { rootMargin: '-25% 0px -60% 0px', threshold: 0 });
+  Object.keys(map).forEach(function (id) {
+    var section = document.getElementById(id);
+    if (section) io.observe(section);
+  });
 })();
 
 // Sliding glow pill behind hovered nav item
@@ -238,7 +286,7 @@ document.querySelectorAll('.book-form').forEach(function (f) {
   if (page !== 'index.html') return;
   var sequence = [
     ['story', 'story'], ['menu', 'menu'], ['classes', 'classes'], ['custom', 'custom'],
-    ['reviews', 'reviews'], ['gallery', 'gallery'], ['order', 'order'], ['contact', 'contact']
+    ['reviews', 'reviews'], ['gallery', 'gallery'], ['contact', 'contact']
   ];
   var links = document.querySelectorAll('.nav6 .main-nav [data-key]');
   function sync() {
@@ -250,8 +298,9 @@ document.querySelectorAll('.book-form').forEach(function (f) {
     });
     links.forEach(function (a) { a.classList.toggle('current', a.dataset.key === active); });
   }
-  addEventListener('scroll', sync, { passive: true });
-  addEventListener('resize', sync);
+  var scheduleHomeNav = rafThrottle(sync);
+  addEventListener('scroll', scheduleHomeNav, { passive: true });
+  addEventListener('resize', scheduleHomeNav);
   sync();
 })();
 
@@ -259,7 +308,8 @@ document.querySelectorAll('.book-form').forEach(function (f) {
 (function () {
   var f = document.querySelector('.wa-float'); if (!f) return;
   function t() { f.classList.toggle('show', window.scrollY > window.innerHeight * 0.6); }
-  addEventListener('scroll', t, { passive: true }); t();
+  var scheduleWa = rafThrottle(t);
+  addEventListener('scroll', scheduleWa, { passive: true }); t();
 })();
 
 // ============ ORDER PAGE ============
@@ -334,13 +384,8 @@ document.querySelectorAll('.book-form').forEach(function (f) {
     });
   }
   function logoDataUrl() {
-    try {
-      var img = document.querySelector('.site-header .brand-logo');
-      if (!img || !img.complete || !img.naturalWidth) return '';
-      var canvas = document.createElement('canvas'); canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
-      canvas.getContext('2d').drawImage(img, 0, 0);
-      return canvas.toDataURL('image/jpeg', .92);
-    } catch (_) { return ''; }
+    // Embedded during the build so the standalone printable receipt always carries the logo.
+    return form.dataset.receiptLogo || '';
   }
   function makeReceipt(data) {
     var logo = data.logo ? '<img class="receipt-logo" src="' + data.logo + '" alt="Mystery Bakebite logo">' : '';
@@ -350,15 +395,15 @@ document.querySelectorAll('.book-form').forEach(function (f) {
     var delivery = data.delivery ? '<div class="sum-row"><span>Delivery fee</span><b>Confirmed on WhatsApp</b></div>' : '<div class="sum-row"><span>Pickup</span><b>Free</b></div>';
     var notes = data.notes ? '<section class="receipt-info"><h3>Order notes</h3><p>' + escReceipt(data.notes).replace(/\n/g, '<br>') + '</p></section>' : '';
     return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mystery Bakebite order receipt</title><style>' +
-      ' :root{--brown:#3A1F0F;--gold:#D4A437;--pink:#F7B7C8;--cream:#F5E6D6;--warm:#8B5E3C}*{box-sizing:border-box}body{margin:0;padding:32px 16px;background:#3A1F0F;color:var(--brown);font:16px/1.55 Georgia,"Times New Roman",serif}.receipt{max-width:780px;margin:auto;padding:clamp(22px,5vw,48px);background:var(--cream);border:1px solid var(--gold);border-radius:24px;box-shadow:0 28px 65px -35px rgba(0,0,0,.7)}.brand{display:flex;align-items:center;gap:16px;padding-bottom:22px;border-bottom:1px solid rgba(139,94,60,.32)}.receipt-logo{width:70px;height:70px;object-fit:cover;border-radius:50%;border:2px solid var(--gold)}.eyebrow{color:var(--warm);font-size:11px;font-weight:bold;letter-spacing:.24em;text-transform:uppercase}.brand h1{margin:2px 0 0;font-size:clamp(23px,4vw,34px);line-height:1.15;color:var(--brown)}.slogan{margin:3px 0 0;color:var(--warm);font-style:italic}.title{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:26px 0}.title h2{margin:0;font-size:25px}.title p{margin:4px 0 0;color:var(--warm);font-size:13px}.status{padding:7px 12px;border:1px solid var(--gold);border-radius:99px;color:var(--brown);background:rgba(212,164,55,.14);font-size:10px;font-weight:bold;letter-spacing:.1em;text-align:center}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse}th{padding:10px 8px;text-align:left;color:var(--warm);font-size:11px;letter-spacing:.11em;text-transform:uppercase;border-bottom:1px solid var(--gold)}td{padding:12px 8px;border-bottom:1px solid rgba(139,94,60,.2);vertical-align:top}td small{display:block;color:var(--warm);font-size:12px}td:nth-child(n+2),th:nth-child(n+2){text-align:right;white-space:nowrap}.summary{max-width:420px;margin:22px 0 0 auto;padding:18px 20px;border:1px solid rgba(212,164,55,.5);border-radius:16px;background:rgba(245,230,214,.5)}.sum-row{display:flex;justify-content:space-between;gap:18px;padding:5px 0;color:var(--warm)}.sum-total{display:flex;justify-content:space-between;gap:18px;padding-top:12px;margin-top:8px;border-top:1px solid var(--gold);font-weight:bold;color:var(--brown);font-size:18px}.sum-total b{color:var(--brown)}.receipt-info{margin-top:22px;padding-top:16px;border-top:1px solid rgba(139,94,60,.24)}.receipt-info h3{margin:0 0 5px;font-size:16px}.receipt-info p{margin:0;color:var(--warm)}.notice{margin:24px 0 0;padding:14px 16px;border-left:3px solid var(--gold);background:rgba(212,164,55,.09);color:var(--warm);font-size:13px}.contact{margin-top:20px;color:var(--warm);font-size:13px}.actions{margin-top:24px;display:flex;gap:10px;flex-wrap:wrap}.actions button{border:0;border-radius:99px;padding:12px 18px;background:var(--brown);color:var(--cream);font:inherit;font-weight:bold;cursor:pointer}.actions button:hover{background:var(--warm)}@media(max-width:520px){body{padding:12px}.receipt{border-radius:18px}.title{align-items:flex-start;flex-direction:column}.brand{align-items:flex-start}.receipt-logo{width:56px;height:56px}th,td{padding:9px 5px;font-size:13px}.summary{max-width:none}}@media print{body{padding:0;background:#fff}.receipt{max-width:none;border:0;border-radius:0;box-shadow:none}.actions{display:none}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}' +
-      '</style></head><body><main class="receipt"><header class="brand">' + logo + '<div><span class="eyebrow">Tamale, Northern Ghana</span><h1>Mystery Bakebite</h1><p class="slogan">Unveiling The Uniqueness of A Recipe</p></div></header>' +
+      ' :root{--brown:#3A1F0F;--gold:#D4A437;--pink:#F7B7C8;--cream:#F5E6D6;--warm:#8B5E3C}*{box-sizing:border-box}body{width:80mm;max-width:100vw;margin:0 auto;padding:0;background:#fff;color:var(--brown);font:11px/1.45 Georgia,serif}.receipt{width:80mm;max-width:100%;margin:0 auto;padding:4mm;background:#fff;color:var(--brown);border:0;border-radius:0;box-shadow:none}.brand{display:flex;flex-direction:column;align-items:center;gap:2mm;padding-bottom:3mm;border-bottom:1px dashed rgba(139,94,60,.45);text-align:center}.receipt-logo{display:block;width:36mm;height:36mm;max-width:100%;object-fit:contain;border:0;border-radius:0;background:transparent}.eyebrow{color:var(--warm);font-size:8px;font-weight:bold;letter-spacing:.16em;text-transform:uppercase}.brand h1{margin:1mm 0 0;font-size:15px;line-height:1.15;color:var(--brown)}.slogan{margin:1mm 0 0;color:var(--warm);font-size:9px;font-style:italic}.title{display:flex;align-items:flex-start;flex-direction:column;gap:2mm;margin:4mm 0}.title h2{margin:0;font-size:16px;line-height:1.2}.title p{margin:1mm 0 0;color:var(--warm);font-size:9px}.status{display:inline-block;padding:1.5mm 2mm;border:1px solid var(--gold);border-radius:99px;color:var(--brown);background:rgba(212,164,55,.14);font-size:7px;font-weight:bold;letter-spacing:.08em;text-align:center}.table-wrap{width:100%;overflow:visible}table{width:100%;table-layout:fixed;border-collapse:collapse}th{padding:1.5mm .8mm;text-align:left;color:var(--warm);font-size:7px;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--gold)}td{padding:2mm .8mm;border-bottom:1px dashed rgba(139,94,60,.26);vertical-align:top;font-size:8px;overflow-wrap:anywhere}td small{display:block;color:var(--warm);font-size:7px}th:nth-child(1),td:nth-child(1){width:39%}th:nth-child(2),td:nth-child(2){width:9%}th:nth-child(3),td:nth-child(3){width:25%}th:nth-child(4),td:nth-child(4){width:27%}td:nth-child(n+2),th:nth-child(n+2){text-align:right;white-space:nowrap}.summary{width:100%;max-width:none;margin:4mm 0 0;padding:2mm;border:1px solid rgba(212,164,55,.5);border-radius:2mm;background:#fff}.sum-row{display:flex;justify-content:space-between;gap:2mm;padding:1mm 0;color:var(--warm);font-size:8px}.sum-total{display:flex;justify-content:space-between;gap:2mm;padding-top:2mm;margin-top:1mm;border-top:1px solid var(--gold);font-weight:bold;color:var(--brown);font-size:11px}.sum-total b{color:var(--brown)}.receipt-info{margin-top:3mm;padding-top:2mm;border-top:1px dashed rgba(139,94,60,.3)}.receipt-info h3{margin:0 0 1mm;font-size:9px}.receipt-info p{margin:0;color:var(--warm);font-size:8px}.notice{margin:3mm 0 0;padding:2mm;border-left:2px solid var(--gold);background:rgba(212,164,55,.08);color:var(--warm);font-size:8px}.contact{margin-top:3mm;color:var(--warm);font-size:7px;text-align:center;overflow-wrap:anywhere}.actions{margin-top:4mm;display:flex;justify-content:center;gap:2mm;flex-wrap:wrap}.actions button{border:0;border-radius:99px;padding:2mm 3mm;background:var(--brown);color:var(--cream);font:inherit;font-size:9px;font-weight:bold;cursor:pointer}.actions button:hover{background:var(--warm)}@media(max-width:340px){body,.receipt{width:100vw}}@page{size:80mm 250mm;margin:0}@media print{html,body{width:80mm;min-width:80mm;max-width:80mm;margin:0;padding:0;background:#fff}.receipt{width:80mm;max-width:80mm;margin:0;padding:4mm 4mm 6mm;border:0;border-radius:0;box-shadow:none}.actions{display:none}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}' +
+      '</style></head><body><main class="receipt"><header class="brand">' + logo + '<div><span class="eyebrow">Tamale, Ghana</span><h1>Mystery Bakebite</h1><p class="slogan">Unveiling The Uniqueness of A Recipe</p></div></header>' +
       '<section class="title"><div><h2>Order request receipt</h2><p>Prepared ' + escReceipt(data.created) + '</p></div><span class="status">AWAITING WHATSAPP CONFIRMATION</span></section>' +
       '<section class="receipt-info"><h3>Customer</h3><p><b>' + escReceipt(data.name) + '</b><br>' + escReceipt(data.phone) + '</p></section>' +
       '<section class="receipt-info"><h3>Order details</h3><p>' + escReceipt(data.fulfilment) + ' on ' + escReceipt(data.date) + ' at ' + escReceipt(data.time) + (data.delivery && data.area ? '<br>Delivery area: ' + escReceipt(data.area) : '') + '</p></section>' +
       '<div class="table-wrap"><table><thead><tr><th>Item</th><th>Qty</th><th>Unit price</th><th>Line total</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
       '<section class="summary"><div class="sum-row"><span>Subtotal</span><b>GH₵ ' + fmt(data.subtotal) + '</b></div>' + delivery + '<div class="sum-row"><span>Payment</span><b>' + escReceipt(data.payment) + '</b></div><div class="sum-total"><span>Estimated total</span><b>GH₵ ' + fmt(data.subtotal) + (data.delivery ? ' + delivery' : '') + '</b></div></section>' +
       notes + '<p class="notice">This is an order request receipt, not proof of payment. We will confirm availability, any delivery fee and your final total in the WhatsApp chat.</p>' +
-      '<p class="contact">+233 55 452 0532 · mysterybakebite@gmail.com · Tamale, Northern Ghana</p><div class="actions"><button onclick="window.print()">Print or save as PDF</button></div></main></body></html>';
+      '<p class="contact">+233 55 452 0532 · mysterybakebite@gmail.com · Tamale, Ghana</p><div class="actions"><button onclick="window.print()">Print or save as PDF</button></div></main></body></html>';
   }
   function saveReceipt() {
     if (!receiptMarkup) return;
@@ -371,9 +416,9 @@ document.querySelectorAll('.book-form').forEach(function (f) {
     var url = URL.createObjectURL(new Blob([receiptMarkup], { type: 'text/html;charset=utf-8' }));
     window.open(url, '_blank', 'noopener'); setTimeout(function () { URL.revokeObjectURL(url); }, 120000);
   }
-  var downloadReceiptButton = document.getElementById('downloadReceipt');
+  // The receipt is downloaded automatically as soon as it is generated.
+  // Printing remains available as a separate POS/PDF action.
   var printReceiptButton = document.getElementById('printReceipt');
-  if (downloadReceiptButton) downloadReceiptButton.addEventListener('click', saveReceipt);
   if (printReceiptButton) printReceiptButton.addEventListener('click', openReceiptForPrint);
 
   form.addEventListener('submit', function (e) {
@@ -479,7 +524,14 @@ document.querySelectorAll('.book-form').forEach(function (f) {
     }
   }
   chips.forEach(function (c, i) {
-    c.addEventListener('click', function () { mark(i); });
+    c.addEventListener('click', function (event) {
+      var target = targets[i];
+      if (!target) return;
+      event.preventDefault();
+      target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start', inline: 'nearest' });
+      try { history.replaceState(null, '', '#' + c.dataset.cat); } catch (ignore) {}
+      mark(i);
+    });
   });
   var ticking = false;
   function update() {

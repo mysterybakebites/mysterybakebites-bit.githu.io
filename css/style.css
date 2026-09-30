@@ -25,6 +25,14 @@
 }
 
 * { box-sizing: border-box; }
+
+/* Keep keyboard navigation visible across every interactive surface. */
+a:focus-visible, button:focus-visible, summary:focus-visible,
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 3px;
+}
+
 html { scroll-behavior: smooth; scroll-padding-top: 92px; }
 body {
   margin: 0;
@@ -984,7 +992,6 @@ section > .wrap { position: relative; z-index: 1; }
   transition: transform .35s, border-color .35s;
 }
 .t-card:hover { transform: translateY(-6px); border-color: var(--gold); }
-.t-stars { color: var(--gold); letter-spacing: .2em; font-size: .95rem; }
 .t-card blockquote { margin: 12px 0 20px; font-style: italic; color: var(--cream); line-height: 1.6; flex: 1; }
 .t-card figcaption { display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--glass-edge-dark); padding-top: 14px; }
 .t-card figcaption img { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; border: 2px solid var(--gold); }
@@ -1202,16 +1209,12 @@ ol.recipes.big { margin: 0; }
           mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
 }
 .t-track { display: flex; gap: 20px; width: max-content; animation: slideLTR 170s linear infinite; }
-.t-carousel:hover .t-track, .t-carousel:focus-within .t-track { animation-play-state: paused; }
-.t-carousel.is-playing .t-track { animation-play-state: running; }
-.t-carousel.is-paused .t-track { animation-play-state: paused; }
 .t-track .t-card { width: 320px; flex: none; }
 .t-track .t-card:hover { transform: translateY(-6px); }
 @media (max-width: 640px) { .t-track .t-card { width: 270px; } .t-track { animation-duration: 140s; } }
 @media (prefers-reduced-motion: reduce) {
   .t-carousel { overflow-x: auto; }
   .t-track { animation: none !important; }
-  .review-motion-controls { display: none; }
 }
 
 /* ---------- Slogan placements ---------- */
@@ -2492,3 +2495,15 @@ main:has(.closing) + .footer .f-cta { display: none; }
 .recipes li.tba, .rcard.tba h3 { color: var(--warm); font-style: italic; }
 .rcard.tba { border-style: dashed; }
 .levels .menu-ctas { justify-content: center; margin-top: 10px; }
+
+/* Recipe cards: image-led pastry references with a stable box for smooth scrolling. */
+.rcard { display: flex; flex-direction: column; }
+.rcard-img { height: 156px; margin: -26px -22px 20px; overflow: hidden; background: var(--brown); }
+.rcard-img img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .45s ease; }
+.rcard:hover .rcard-img img { transform: scale(1.045); }
+@media (max-width: 640px) {
+  .rcard-img { height: 170px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rcard-img img { transition: none; }
+}
