@@ -325,11 +325,60 @@ document.querySelectorAll('.book-form').forEach(function (f) {
   function qtyOf(r) { return Math.max(0, Math.min(99, parseInt(r.querySelector('input').value, 10) || 0)); }
   function set(r, v) { r.querySelector('input').value = Math.max(0, Math.min(99, v)); update(); }
 
+  var cakeBuilder = form.querySelector('.cake-builder');
+  var cakeBuilderRow = cakeBuilder && cakeBuilder.querySelector('.cake-builder-line');
+  function optionLabel(opt) {
+    return opt ? opt.textContent.replace(/\s*·\s*(?:from\s*)?(?:\+\s*)?GH₵.*$/i, '').replace(/\s*·\s*(?:included|no extra).*$/i, '').trim() : '';
+  }
+  function syncCakeBuilder() {
+    if (!cakeBuilder || !cakeBuilderRow) return;
+    var type = cakeBuilder.querySelector('#cakeType'), base = cakeBuilder.querySelector('#cakeBase');
+    var flavour = cakeBuilder.querySelector('#cakeFlavour'), icing = cakeBuilder.querySelector('#cakeIcing');
+    var messageInput = cakeBuilder.querySelector('#cakeMessage'), themeInput = cakeBuilder.querySelector('#cakeTheme');
+    var typeOpt = type.options[type.selectedIndex], baseOpt = base.options[base.selectedIndex];
+    var flavourOpt = flavour.options[flavour.selectedIndex], icingOpt = icing.options[icing.selectedIndex];
+    var basePrice = parseFloat(baseOpt.dataset.price || '0');
+    var flavourPrice = parseFloat(flavourOpt.dataset.price || '0'), icingPrice = parseFloat(icingOpt.dataset.price || '0');
+    var addons = Array.prototype.slice.call(cakeBuilder.querySelectorAll('.cake-addon input:checked'));
+    var addonPrice = addons.reduce(function (sum, item) { return sum + parseFloat(item.dataset.price || '0'); }, 0);
+    var hasRange = !!(typeOpt.dataset.range || baseOpt.dataset.range || icingOpt.dataset.range || addons.some(function (x) { return x.dataset.range; }));
+    var total = basePrice + flavourPrice + icingPrice + addonPrice;
+    var typeLabel = optionLabel(typeOpt), baseLabel = baseOpt.value === 'choose' ? 'Choose a size / price basis' : optionLabel(baseOpt);
+    var addonLabels = addons.map(function (x) { return x.value; });
+    var customLabels = [];
+    if (messageInput && messageInput.value.trim()) customLabels.push('Message: ' + messageInput.value.trim().replace(/[·|]/g, ' '));
+    if (themeInput && themeInput.value.trim()) customLabels.push('Theme/reference: ' + themeInput.value.trim().replace(/[·|]/g, ' '));
+    var detailLabel = [typeLabel, baseLabel, optionLabel(flavourOpt) + ' flavour', optionLabel(icingOpt)].concat(addonLabels, customLabels).join(' · ');
+    cakeBuilderRow.dataset.name = 'Custom cake: ' + detailLabel;
+    cakeBuilderRow.dataset.price = total.toFixed(2);
+    cakeBuilderRow.querySelector('.oi-info b').textContent = 'Custom cake: ' + typeLabel;
+    cakeBuilderRow.querySelector('.oi-var').textContent = detailLabel;
+    cakeBuilderRow.querySelector('.oi-price').textContent = 'GH₵ ' + fmt(total) + (hasRange ? ' +' : '');
+    var totalLabel = cakeBuilder.querySelector('#cakeBuilderTotalLabel');
+    var totalOutput = cakeBuilder.querySelector('#cakeBuilderTotal');
+    var breakdown = cakeBuilder.querySelector('#cakeBuilderBreakdown');
+    var addButton = cakeBuilder.querySelector('#addCakeBuilder');
+    if (addButton) addButton.disabled = baseOpt.value === 'choose';
+    if (totalLabel) totalLabel.textContent = baseOpt.value === 'choose' ? 'Choose a base size' : (hasRange ? 'Starting total' : 'Estimated total');
+    if (totalOutput) totalOutput.textContent = 'GH₵ ' + fmt(total) + (hasRange ? ' +' : '');
+    if (breakdown) breakdown.textContent = 'Base: GH₵ ' + fmt(basePrice) + ' · Flavour: GH₵ ' + fmt(flavourPrice) + ' · Icing: GH₵ ' + fmt(icingPrice) + ' · Extras: GH₵ ' + fmt(addonPrice);
+    var typeHint = cakeBuilder.querySelector('#cakeTypeHint');
+    if (typeHint) typeHint.textContent = typeOpt.dataset.detail || 'Choose a cake type, then refine the size, finish and extras below.';
+  }
+
   rows.forEach(function (r) {
     r.querySelector('.q-plus').addEventListener('click', function () { set(r, qtyOf(r) + 1); });
     r.querySelector('.q-minus').addEventListener('click', function () { set(r, qtyOf(r) - 1); });
     r.querySelector('input').addEventListener('input', update);
   });
+  if (cakeBuilder) {
+    cakeBuilder.querySelectorAll('select, .cake-addon input, #cakeMessage, #cakeTheme').forEach(function (control) {
+      control.addEventListener('change', function () { syncCakeBuilder(); update(); });
+      if (control.matches('#cakeMessage, #cakeTheme')) control.addEventListener('input', function () { syncCakeBuilder(); update(); });
+    });
+    var addCakeButton = cakeBuilder.querySelector('#addCakeBuilder');
+    if (addCakeButton) addCakeButton.addEventListener('click', function () { syncCakeBuilder(); cakeBuilderRow.querySelector('input').value = 1; update(); });
+  }
 
   // preselect from ?add=id and open #cat-
   var add = new URLSearchParams(location.search).get('add');
@@ -344,6 +393,7 @@ document.querySelectorAll('.book-form').forEach(function (f) {
 
   function chosen() { return rows.filter(function (r) { return qtyOf(r) > 0; }); }
   function update() {
+    syncCakeBuilder();
     var items = chosen(), sub = 0, n = 0;
     list.innerHTML = '';
     items.forEach(function (r) {

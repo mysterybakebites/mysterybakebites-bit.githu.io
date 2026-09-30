@@ -1262,3 +1262,38 @@ html.js .order-page .ocat.reveal {
 @media (prefers-reduced-motion: reduce) {
   .t-track, .t-track:hover, .t-carousel:focus-within .t-track { animation: none !important; }
 }
+
+/* Custom cake builder: compact, editable and price-transparent. */
+.cake-builder-body { background: linear-gradient(180deg, rgba(212,164,55,.06), transparent); }
+.cake-builder-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; margin-top: 14px; }
+.cake-field { display: grid; gap: 7px; }
+.cake-field > span, .cake-addons legend { color: var(--lx-brown); font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.cake-field select, .cake-field input { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid rgba(139,94,60,.3); border-radius: 12px; background: var(--lx-cream); color: var(--lx-brown); font: inherit; }
+.cake-field input::placeholder { color: rgba(139,94,60,.65); }
+.cake-field input:focus, .cake-field select:focus { outline: 2px solid var(--lx-gold); outline-offset: 1px; }
+.cake-field small { color: var(--lx-warm); font-size: .75rem; line-height: 1.4; }
+.cake-addons { margin: 18px 0 0; padding: 14px 0 0; border: 0; border-top: 1px dashed rgba(139,94,60,.28); }
+.cake-addons legend { padding: 0 8px 0 0; }
+.cake-addon-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin-top: 10px; }
+.cake-addon { position: relative; display: block; cursor: pointer; }
+.cake-addon input { position: absolute; opacity: 0; pointer-events: none; }
+.cake-addon span { display: flex; min-height: 54px; flex-direction: column; justify-content: center; gap: 3px; padding: 9px 10px; border: 1px solid rgba(139,94,60,.25); border-radius: 12px; background: rgba(245,230,214,.5); color: var(--lx-brown); font-size: .8rem; line-height: 1.2; transition: border-color .2s ease, background .2s ease, transform .2s ease; }
+.cake-addon small { color: var(--lx-warm); font-size: .7rem; }
+.cake-addon:hover span { transform: translateY(-2px); border-color: var(--lx-gold); }
+.cake-addon input:checked + span { border-color: var(--lx-gold); background: rgba(212,164,55,.16); box-shadow: 0 0 0 2px rgba(212,164,55,.13); }
+.cake-addon input:focus-visible + span { outline: 2px solid var(--lx-brown); outline-offset: 2px; }
+.cake-builder-summary { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 18px; padding: 14px 16px; border: 1px solid rgba(212,164,55,.5); border-radius: 14px; background: var(--lx-cream); }
+.cake-builder-summary div { display: grid; gap: 3px; }
+.cake-builder-summary span { color: var(--lx-warm); font-size: .72rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.cake-builder-summary strong { color: var(--lx-brown); font-size: 1.35rem; }
+.cake-builder-summary p { max-width: 44ch; margin: 0; color: var(--lx-warm); font-size: .78rem; line-height: 1.45; text-align: right; }
+.cake-add-button { margin-top: 14px; }
+.cake-builder-line { margin-top: 12px; padding: 11px 6px 0; border-top: 1px dashed rgba(139,94,60,.25); }
+@media (max-width: 760px) { .cake-builder-grid, .cake-addon-grid { grid-template-columns: 1fr 1fr; } .cake-builder-summary { align-items: flex-start; flex-direction: column; gap: 8px; } .cake-builder-summary p { text-align: left; } }
+@media (max-width: 520px) { .cake-builder-grid, .cake-addon-grid { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .cake-addon span { transition: none; } }
+
+.cake-builder-link { margin-top: 12px; padding-top: 12px; border-top: 1px dashed rgba(139,94,60,.25); }
+.cake-builder-link a { color: var(--lx-brown); font-size: .82rem; font-weight: 800; text-decoration: underline; text-decoration-color: var(--lx-gold); text-underline-offset: 4px; }
+.cake-builder-link a:hover { color: var(--lx-warm); }
+.cake-add-button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
