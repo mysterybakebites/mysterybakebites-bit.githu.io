@@ -1467,3 +1467,6 @@ html.js .order-page .ocat.reveal {
 .cart .cake-cart-spec-title { color: var(--lx-pink); }
 .cart .cake-cart-tier { color: var(--lx-cream); }
 .cart .cake-cart-tier-total, .cart .cake-cart-total { color: var(--lx-cream); }
+.cake-simple-select-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 760px) { .cake-simple-select-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { .cake-simple-select-grid { grid-template-columns: 1fr; } }

@@ -397,15 +397,15 @@ document.querySelectorAll('.book-form').forEach(function (f) {
   }
   function cakeTierFieldMarkup(index, count, shape) {
     var prefix = 'tier-' + index;
-    var previousSize = index > 0 ? cakeRadioValue(cakeFieldName('tier-' + (index - 1), 'size')) : '';
+    var previousSize = index === 1 ? cakeRadioValue('cake-global-size') : (index > 1 ? cakeRadioValue(cakeFieldName('tier-' + (index - 1), 'size')) : '');
     var sizeList = cakeSizeOptions(shape, index, previousSize);
-    var selectedSize = cakeRadioValue(cakeFieldName(prefix, 'size'));
+    var selectedSize = index === 0 ? cakeRadioValue('cake-global-size') : cakeRadioValue(cakeFieldName(prefix, 'size'));
     var selectedLayers = cakeRadioValue(cakeFieldName(prefix, 'layers'));
     var selectedFlavour = cakeRadioValue(cakeFieldName(prefix, 'flavour'));
     var selectedFilling = cakeRadioValue(cakeFieldName(prefix, 'filling'));
     var selectedIcing = cakeRadioValue(cakeFieldName(prefix, 'icing'));
     var fields = '';
-    fields += cakeOptionCards(sizeList, cakeFieldName(prefix, 'size'), 'single', selectedSize, 'size-' + index, true);
+    if (index > 0) fields += cakeOptionCards(sizeList, cakeFieldName(prefix, 'size'), 'single', selectedSize, 'size-' + index, true);
     if (count > 1 || cakeState.structureId === 'one-tier') fields += cakeOptionCards(cakeConfig.internalLayers, cakeFieldName(prefix, 'layers'), 'single', selectedLayers, 'layers', true);
     fields += cakeOptionCards(cakeConfig.flavours, cakeFieldName(prefix, 'flavour'), 'single', selectedFlavour, 'flavour', true);
     fields += cakeOptionCards(cakeConfig.fillings, cakeFieldName(prefix, 'filling'), 'single', selectedFilling, 'filling', false);
@@ -419,7 +419,18 @@ document.querySelectorAll('.book-form').forEach(function (f) {
       return '<option value="' + cakeEscape(item.id) + '">' + cakeEscape(item.name) + '</option>';
     }).join('') + '</select></label><label class="cake-structure-select-label"><span>Shape <i>Required</i></span><select name="cake-global-shape" aria-required="true"><option value="">Choose a shape</option>' + (cakeConfig.shapes || []).filter(function (item) { return item.active !== false; }).map(function (item) {
       return '<option value="' + cakeEscape(item.id) + '">' + cakeEscape(item.name) + '</option>';
-    }).join('') + '</select></label></div><small class="cake-simple-help">For tiered cakes, this shape applies to all tiers. Choose Custom Cake for unusual shapes or structures.</small>';
+    }).join('') + '</select></label><label class="cake-structure-select-label"><span>Size <i>Required</i></span><select name="cake-global-size" aria-required="true"><option value="">Choose a size</option></select></label></div><small class="cake-simple-help">For tiered cakes, this is the cake size for one cake or the bottom tier. Upper tiers are chosen smaller in the next step.</small>';
+    cakeRenderGlobalSizeOptions();
+  }
+  function cakeRenderGlobalSizeOptions() {
+    if (!cakeBuilder) return;
+    var select = cakeBuilder.querySelector('select[name="cake-global-size"]');
+    if (!select) return;
+    var shape = cakeRadioValue('cake-global-shape'), current = select.value;
+    var allowed = (shape && cakeConfig.shapeSizes && cakeConfig.shapeSizes[shape]) || cakeConfig.sizeOrder || [];
+    var options = (cakeConfig.sizes || []).filter(function (item) { return item.active !== false && allowed.indexOf(item.id) > -1; }).sort(function (a, b) { return (cakeConfig.sizeOrder || []).indexOf(a.id) - (cakeConfig.sizeOrder || []).indexOf(b.id); });
+    select.innerHTML = '<option value="">Choose a size</option>' + options.map(function (item) { return '<option value="' + cakeEscape(item.id) + '">' + cakeEscape(item.name) + ' · ' + cakeEscape(cakePriceText(item, true)) + '</option>'; }).join('');
+    if (options.some(function (item) { return item.id === current; })) select.value = current;
   }
   function cakeUploadMarkup() {
     return '<div class="cake-upload-field"><label for="cakeInspirationImages">Inspiration images <small>Optional · up to ' + cakeConfig.limits.inspirationImages + ' JPG, PNG or WEBP files · ' + cakeConfig.limits.maxFileSizeMb + 'MB each</small></label><input id="cakeInspirationImages" type="file" accept="image/jpeg,image/png,image/webp" multiple><div class="cake-upload-list" id="cakeUploadList">No inspiration images added.</div><p class="cake-upload-help">Images are listed in your order request. Please also attach them in the WhatsApp chat so the baker can review them.</p></div>';
@@ -485,7 +496,7 @@ document.querySelectorAll('.book-form').forEach(function (f) {
     var cards = Array.prototype.slice.call(cakeBuilder.querySelectorAll('.cake-tier-card'));
     cards.forEach(function (card, index) {
       if (index === 0) return;
-      var previous = cakeRadioValue(cakeFieldName('tier-' + (index - 1), 'size'));
+      var previous = index === 1 ? cakeRadioValue('cake-global-size') : cakeRadioValue(cakeFieldName('tier-' + (index - 1), 'size'));
       var previousNumber = previous ? parseFloat(previous) : null;
       var select = card.querySelector('select[data-option-group="size-' + index + '"]');
       if (!select) return;
@@ -540,7 +551,7 @@ document.querySelectorAll('.book-form').forEach(function (f) {
     cakeRenderUploadPreviews(); cakeSyncBuilder(); update();
   }
   function cakeReadTier(index, count) {
-    var prefix = 'tier-' + index, size = cakeOptionBy(cakeConfig.sizes, cakeRadioValue(cakeFieldName(prefix, 'size'))), layers = cakeOptionBy(cakeConfig.internalLayers, cakeRadioValue(cakeFieldName(prefix, 'layers'))), flavour = cakeOptionBy(cakeConfig.flavours, cakeRadioValue(cakeFieldName(prefix, 'flavour'))), icing = cakeOptionBy(cakeConfig.icings, cakeRadioValue(cakeFieldName(prefix, 'icing'))), colour = cakeOptionBy(cakeConfig.colours, cakeRadioValue('cake-colour')), customColourInput = cakeBuilder && cakeBuilder.querySelector('input[name="cake-custom-colour"]'), shape = cakeOptionBy(cakeConfig.shapes, cakeRadioValue('cake-global-shape')), fillings = cakeCheckedValues(cakeFieldName(prefix, 'filling')).map(function (id) { return cakeOptionBy(cakeConfig.fillings, id); }).filter(Boolean);
+    var prefix = 'tier-' + index, size = cakeOptionBy(cakeConfig.sizes, index === 0 ? cakeRadioValue('cake-global-size') : cakeRadioValue(cakeFieldName(prefix, 'size'))), layers = cakeOptionBy(cakeConfig.internalLayers, cakeRadioValue(cakeFieldName(prefix, 'layers'))), flavour = cakeOptionBy(cakeConfig.flavours, cakeRadioValue(cakeFieldName(prefix, 'flavour'))), icing = cakeOptionBy(cakeConfig.icings, cakeRadioValue(cakeFieldName(prefix, 'icing'))), colour = cakeOptionBy(cakeConfig.colours, cakeRadioValue('cake-colour')), customColourInput = cakeBuilder && cakeBuilder.querySelector('input[name="cake-custom-colour"]'), shape = cakeOptionBy(cakeConfig.shapes, cakeRadioValue('cake-global-shape')), fillings = cakeCheckedValues(cakeFieldName(prefix, 'filling')).map(function (id) { return cakeOptionBy(cakeConfig.fillings, id); }).filter(Boolean);
     var total = 0, quote = false, lines = [];
     function add(item, label, base) { if (!item) return; if (item.pricing_type === 'custom_quote' || item.price == null) { quote = true; lines.push(label + ': Custom Quote'); } else { total += Number(item.price || 0); if (item.price > 0) lines.push(label + ': ' + (base ? 'GH₵ ' : '+ GH₵ ') + fmt(item.price) + (item.range ? ' starting' : '')); } }
     add(size, 'Size', true); add(layers, 'Internal layers', false); add(flavour, 'Flavour', false); fillings.forEach(function (item) { add(item, 'Filling', false); }); add(icing, 'Icing', false); add(colour, 'Colour', false); add(shape, 'Shape', false);
@@ -663,8 +674,9 @@ document.querySelectorAll('.book-form').forEach(function (f) {
     if (spec.structureId === 'custom') { if (!spec.customDescription) errors.push('Please describe your custom cake so the baker can prepare a quote.'); }
     else {
       if (!cakeRadioValue('cake-global-shape')) errors.push('Please select a cake shape.');
-      spec.tiers.forEach(function (tier) {
-        if (!tier.size) errors.push('Please select a size for ' + tier.label + '.');
+      if (!cakeRadioValue('cake-global-size')) errors.push('Please select a cake size.');
+      spec.tiers.forEach(function (tier, index) {
+        if (index > 0 && !tier.size) errors.push('Please select a smaller size for ' + tier.label + '.');
         if (!tier.layers && (spec.structureId !== 'one-layer')) errors.push('Please select the number of internal layers for ' + tier.label + '.');
         if (!tier.flavour) errors.push('Please select a flavour for ' + tier.label + '.');
         if (!tier.icing) errors.push('Please select an icing for ' + tier.label + '.');
@@ -689,7 +701,10 @@ document.querySelectorAll('.book-form').forEach(function (f) {
       if (event.target.name === 'cake-structure') {
         cakeState.structureId = event.target.value; cakeState.message = ''; cakeState.customDescription = ''; cakeBuilderFiles = []; cakeRenderConfig(cakeState.structureId);
         var panel = cakeBuilder.querySelector('#cakeConfigPanel'); if (panel) setTimeout(function () { panel.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' }); }, 80);
-      } else if (event.target.name === 'cake-global-shape' && cakeState.structureId) {
+      } else if (event.target.name === 'cake-global-shape') {
+        cakeRenderGlobalSizeOptions();
+        if (cakeState.structureId) cakeRenderConfig(cakeState.structureId);
+      } else if (event.target.name === 'cake-global-size' && cakeState.structureId) {
         cakeRenderConfig(cakeState.structureId);
       }
       cakeToggleCustomColours(); cakeSyncBuilder();
