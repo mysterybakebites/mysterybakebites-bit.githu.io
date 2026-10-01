@@ -1297,3 +1297,173 @@ html.js .order-page .ocat.reveal {
 .cake-builder-link a { color: var(--lx-brown); font-size: .82rem; font-weight: 800; text-decoration: underline; text-decoration-color: var(--lx-gold); text-underline-offset: 4px; }
 .cake-builder-link a:hover { color: var(--lx-warm); }
 .cake-add-button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+/* Cake-loaf prices stay readable inside the compact menu card. */
+.pricelist #loaves .pl-compact { grid-template-columns: 1fr; gap: 0; }
+.pricelist #loaves .pl-compact li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; min-width: 0; flex-wrap: nowrap; }
+.pricelist #loaves .pl-compact .item { min-width: 0; overflow-wrap: anywhere; line-height: 1.35; }
+.pricelist #loaves .pl-compact .dots { min-width: 14px; }
+.pricelist #loaves .pl-compact .price { white-space: nowrap; font-size: .78rem; }
+.pricelist #loaves .pl-compact .order-btn { flex: none; margin-left: 0; }
+
+/* The menu card sends customers to the full cake builder instead of a second static price list. */
+.pricelist .cake-builder-menu-card .pl-body { gap: 0; }
+.cake-builder-menu-kicker { color: var(--lx-warm); font-size: .68rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.cake-builder-menu-card h2 { margin-top: 8px; }
+.cake-builder-menu-card .note { max-width: 34ch; line-height: 1.5; }
+.cake-builder-menu-list { display: grid; gap: 7px; margin: 18px 0 0; padding: 0; list-style: none; }
+.cake-builder-menu-list li { position: relative; padding-left: 17px; color: var(--lx-brown); font-size: .86rem; line-height: 1.4; }
+.cake-builder-menu-list li::before { content: '✓'; position: absolute; left: 0; color: var(--lx-gold); font-weight: 900; }
+.cake-builder-menu-cta { align-self: flex-start; margin-top: 20px; }
+.cake-builder-menu-note { display: block; margin-top: 10px; color: var(--lx-warm); font-size: .72rem; font-style: italic; line-height: 1.4; }
+
+/* Dynamic custom cake builder. */
+.cake-builder-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 330px); gap: 22px; align-items: start; margin-top: 20px; }
+.cake-builder-main { min-width: 0; }
+.cake-progress { display: flex; align-items: center; gap: 0; margin: 0 0 22px; padding: 0; list-style: none; counter-reset: cake-step; }
+.cake-progress li { display: flex; flex: 1; align-items: center; gap: 7px; color: var(--lx-warm); font-size: .68rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.cake-progress li:not(:last-child)::after { content: ''; flex: 1; height: 1px; margin: 0 8px; background: rgba(139,94,60,.28); }
+.cake-progress-number { display: inline-grid; width: 25px; height: 25px; flex: 0 0 25px; place-items: center; border: 1px solid rgba(139,94,60,.3); border-radius: 50%; color: var(--lx-warm); font-size: .7rem; }
+.cake-progress li.is-active { color: var(--lx-brown); }
+.cake-progress li.is-active .cake-progress-number, .cake-progress li.is-done .cake-progress-number { border-color: var(--lx-gold); background: var(--lx-gold); color: var(--lx-brown); }
+.cake-builder-step { padding: 17px; border: 1px solid rgba(139,94,60,.24); border-radius: 16px; background: rgba(255,255,255,.28); }
+.cake-builder-step + .cake-builder-step { margin-top: 16px; }
+.cake-builder-step > h3 { margin: 0; color: var(--lx-brown); font-size: 1.12rem; }
+.cake-step-help { margin: 6px 0 15px; color: var(--lx-warm); font-size: .82rem; line-height: 1.5; }
+.cake-structure-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.cake-structure-option, .cake-option { position: relative; display: block; cursor: pointer; }
+.cake-structure-option input, .cake-option input { position: absolute; opacity: 0; pointer-events: none; }
+.cake-structure-option span { display: flex; min-height: 103px; flex-direction: column; justify-content: center; gap: 7px; padding: 13px; border: 1px solid rgba(139,94,60,.28); border-radius: 14px; background: rgba(245,230,214,.52); color: var(--lx-brown); transition: transform .2s ease, border-color .2s ease, background .2s ease, box-shadow .2s ease; }
+.cake-structure-option b { font-size: .92rem; }
+.cake-structure-option small { color: var(--lx-warm); font-size: .75rem; line-height: 1.4; }
+.cake-structure-option:hover span, .cake-option:hover span { transform: translateY(-2px); border-color: var(--lx-gold); }
+.cake-structure-option input:checked + span { border-color: var(--lx-gold); background: rgba(212,164,55,.16); box-shadow: 0 0 0 2px rgba(212,164,55,.14); }
+.cake-structure-option input:focus-visible + span, .cake-option input:focus-visible + span { outline: 2px solid var(--lx-brown); outline-offset: 2px; }
+.cake-tier-configs { display: grid; gap: 14px; }
+.cake-tier-card { padding: 15px; border: 1px solid rgba(212,164,55,.42); border-radius: 15px; background: rgba(245,230,214,.34); }
+.cake-tier-card > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cake-tier-kicker { color: var(--lx-warm); font-size: .66rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.cake-tier-card h4, .cake-overall-heading h4, .cake-custom-quote h4 { margin: 3px 0 0; color: var(--lx-brown); font-size: 1rem; }
+.cake-tier-head-actions { display: flex; align-items: center; gap: 9px; }
+.cake-tier-head-actions strong { color: var(--lx-brown); font-size: .82rem; white-space: nowrap; }
+.cake-tier-edit, .cake-apply-tools button { border: 1px solid rgba(139,94,60,.32); border-radius: 999px; padding: 6px 9px; background: transparent; color: var(--lx-brown); font: inherit; font-size: .68rem; font-weight: 800; cursor: pointer; }
+.cake-tier-edit:hover, .cake-apply-tools button:hover { border-color: var(--lx-gold); background: rgba(212,164,55,.12); }
+.cake-tier-help { margin: 7px 0 13px; color: var(--lx-warm); font-size: .75rem; line-height: 1.45; }
+.cake-tier-fields, .cake-overall-fields { display: grid; gap: 13px; }
+.cake-choice-group { min-width: 0; margin: 0; padding: 0; border: 0; }
+.cake-choice-group legend { margin-bottom: 7px; padding: 0; color: var(--lx-brown); font-size: .73rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.cake-choice-group legend i, .cake-text-field i { color: var(--lx-warm); font-size: .65rem; font-style: normal; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.cake-choice-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.cake-option span { display: flex; min-height: 51px; height: 100%; flex-direction: column; justify-content: center; gap: 3px; padding: 8px 9px; border: 1px solid rgba(139,94,60,.24); border-radius: 11px; background: rgba(255,255,255,.34); color: var(--lx-brown); transition: transform .2s ease, border-color .2s ease, background .2s ease, opacity .2s ease; }
+.cake-option b { font-size: .76rem; line-height: 1.25; }
+.cake-option small { color: var(--lx-warm); font-size: .67rem; line-height: 1.2; }
+.cake-option input:checked + span { border-color: var(--lx-gold); background: rgba(212,164,55,.16); box-shadow: 0 0 0 2px rgba(212,164,55,.11); }
+.cake-option-quote span { border-style: dashed; }
+.cake-option.is-disabled { cursor: not-allowed; }
+.cake-option.is-disabled span, .cake-option input:disabled + span { opacity: .38; transform: none; }
+.cake-overall-config { margin-top: 14px; padding-top: 16px; border-top: 1px dashed rgba(139,94,60,.3); }
+.cake-overall-heading { margin-bottom: 12px; }
+.cake-overall-heading p { margin: 5px 0 0; color: var(--lx-warm); font-size: .76rem; line-height: 1.45; }
+.cake-apply-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.cake-apply-tools > span { margin-right: 3px; color: var(--lx-warm); font-size: .7rem; font-weight: 800; text-transform: uppercase; }
+.cake-text-field { display: grid; gap: 7px; color: var(--lx-brown); font-size: .73rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.cake-text-field input, .cake-text-field textarea { width: 100%; padding: 10px 12px; border: 1px solid rgba(139,94,60,.3); border-radius: 11px; background: var(--lx-cream); color: var(--lx-brown); font: inherit; font-size: .85rem; letter-spacing: 0; text-transform: none; resize: vertical; }
+.cake-text-field input:focus, .cake-text-field textarea:focus { outline: 2px solid var(--lx-gold); outline-offset: 1px; }
+.cake-text-field small { color: var(--lx-warm); font-size: .7rem; font-weight: 400; letter-spacing: 0; line-height: 1.35; text-transform: none; }
+.cake-upload-field { display: grid; gap: 7px; }
+.cake-upload-field > label { color: var(--lx-brown); font-size: .73rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.cake-upload-field > label small { display: block; margin-top: 4px; color: var(--lx-warm); font-size: .7rem; font-weight: 400; letter-spacing: 0; line-height: 1.35; text-transform: none; }
+.cake-upload-field input[type=file] { width: 100%; padding: 9px; border: 1px dashed rgba(139,94,60,.34); border-radius: 11px; background: rgba(245,230,214,.55); color: var(--lx-brown); font: inherit; font-size: .78rem; }
+.cake-upload-list { display: flex; flex-wrap: wrap; gap: 6px; color: var(--lx-warm); font-size: .72rem; }
+.cake-upload-file { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 999px; background: rgba(212,164,55,.13); overflow-wrap: anywhere; }
+.cake-upload-file b { display: inline-grid; width: 17px; height: 17px; place-items: center; border-radius: 50%; background: var(--lx-gold); color: var(--lx-brown); font-size: .65rem; }
+.cake-upload-help { margin: 0; color: var(--lx-warm); font-size: .7rem; line-height: 1.4; }
+.cake-custom-quote { display: grid; gap: 13px; }
+.cake-custom-quote > p { margin: 0; padding: 11px 12px; border-left: 3px solid var(--lx-gold); background: rgba(212,164,55,.1); color: var(--lx-warm); font-size: .78rem; line-height: 1.5; }
+.cake-builder-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 13px; margin-top: 17px; }
+.cake-add-button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.cake-action-note { max-width: 48ch; margin: 0; color: var(--lx-warm); font-size: .74rem; line-height: 1.4; }
+.cake-builder-validation { margin-top: 14px; padding: 12px 14px; border-left: 3px solid #A84A3A; border-radius: 8px; background: rgba(168,74,58,.08); color: #713326; font-size: .78rem; line-height: 1.5; }
+.cake-builder-validation ul { margin: 5px 0 0 18px; padding: 0; }
+.cake-builder-summary-panel { position: sticky; top: 112px; overflow: hidden; border: 1px solid rgba(212,164,55,.5); border-radius: 16px; background: var(--lx-cream); box-shadow: var(--lx-shade); }
+.cake-builder-summary-panel > summary { list-style: none; cursor: pointer; }
+.cake-builder-summary-panel > summary::-webkit-details-marker { display: none; }
+.cake-summary-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 13px 15px 0; color: var(--lx-warm); font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.cake-summary-head::after { content: '⌄'; color: var(--lx-gold); font-size: 1.1rem; }
+.cake-builder-summary-panel[open] .cake-summary-head::after { content: '⌃'; }
+.cake-builder-summary-panel > h3, .cake-builder-summary-panel > .cake-builder-summary-content, .cake-builder-summary-panel > .cake-builder-grand-total, .cake-builder-summary-panel > .cake-builder-review-note { margin-left: 15px; margin-right: 15px; }
+.cake-builder-summary-panel > h3 { margin-top: 6px; margin-bottom: 10px; color: var(--lx-brown); font-size: 1.35rem; }
+.cake-builder-summary-content { display: grid; gap: 9px; max-height: 490px; overflow: auto; padding-bottom: 14px; }
+.cake-summary-structure { display: grid; gap: 2px; padding-bottom: 7px; border-bottom: 1px dashed rgba(139,94,60,.28); }
+.cake-summary-structure span, .cake-summary-extras > b { color: var(--lx-warm); font-size: .65rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.cake-summary-structure b { color: var(--lx-brown); font-size: .9rem; }
+.cake-summary-tier { display: grid; gap: 2px; padding: 8px 9px; border-radius: 10px; background: rgba(212,164,55,.1); color: var(--lx-brown); }
+.cake-summary-tier > b { font-size: .76rem; }
+.cake-summary-tier > span, .cake-summary-tier > small { color: var(--lx-warm); font-size: .72rem; line-height: 1.35; }
+.cake-summary-tier > em { color: var(--lx-brown); font-size: .7rem; font-style: normal; font-weight: 800; }
+.cake-summary-extras { display: grid; gap: 3px; padding-top: 5px; color: var(--lx-warm); font-size: .72rem; line-height: 1.35; }
+.cake-builder-grand-total { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 12px; padding-bottom: 12px; border-top: 1px solid var(--lx-gold); }
+.cake-builder-grand-total span { color: var(--lx-warm); font-size: .68rem; font-weight: 800; line-height: 1.25; }
+.cake-builder-grand-total strong { color: var(--lx-brown); font-size: 1.15rem; text-align: right; }
+.cake-builder-review-note { margin-top: 0; padding: 10px; border-radius: 9px; background: rgba(139,94,60,.08); color: var(--lx-warm); font-size: .7rem; line-height: 1.4; }
+@media (max-width: 980px) { .cake-builder-layout { grid-template-columns: 1fr; } .cake-builder-summary-panel { position: sticky; top: auto; bottom: 10px; z-index: 3; order: 2; } .cake-builder-summary-content { max-height: 280px; } }
+@media (max-width: 680px) { .cake-progress li { font-size: .58rem; letter-spacing: .02em; } .cake-progress li:not(:last-child)::after { margin: 0 4px; } .cake-progress-number { width: 22px; height: 22px; flex-basis: 22px; } .cake-structure-grid { grid-template-columns: 1fr 1fr; } .cake-choice-grid { grid-template-columns: 1fr 1fr; } .cake-builder-step { padding: 13px; } .cake-tier-card { padding: 12px; } .cake-builder-actions { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 420px) { .cake-progress li span:last-child { display: none; } .cake-structure-grid, .cake-choice-grid { grid-template-columns: 1fr; } .cake-tier-card > header { align-items: flex-start; flex-direction: column; } }
+@media (prefers-reduced-motion: reduce) { .cake-structure-option span, .cake-option span { transition: none; } }
+.cake-upload-file img { width: 25px; height: 25px; flex: 0 0 25px; object-fit: cover; border-radius: 5px; }
+.cake-custom-colour-field { display: grid; grid-template-columns: auto 54px; align-items: center; gap: 8px; color: var(--lx-brown); font-size: .73rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.cake-custom-colour-field input[type=color] { width: 54px; height: 34px; padding: 3px; border: 1px solid rgba(139,94,60,.3); border-radius: 8px; background: var(--lx-cream); }
+.cake-custom-colour-field small { grid-column: 1/-1; color: var(--lx-warm); font-size: .68rem; font-weight: 400; letter-spacing: 0; text-transform: none; }
+
+/* Dropdown-first cake builder controls. */
+.cake-builder-layout { display: block; }
+.cake-structure-select-wrap { margin-top: 12px; }
+.cake-structure-select-label, .cake-choice-group { display: grid; gap: 7px; }
+.cake-structure-select-label > span { color: var(--lx-brown); font-size: .74rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.cake-structure-select-label > span i, .cake-choice-group legend i { color: var(--lx-warm); font-size: .66rem; font-style: normal; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.cake-structure-select-label select, .cake-choice-select { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid rgba(139,94,60,.3); border-radius: 11px; background: var(--lx-cream); color: var(--lx-brown); font: inherit; font-size: .84rem; }
+.cake-choice-select[multiple] { min-height: 112px; padding: 5px; }
+.cake-choice-select[multiple] option { padding: 7px 8px; border-radius: 6px; }
+.cake-choice-select:focus, .cake-structure-select-label select:focus { outline: 2px solid var(--lx-gold); outline-offset: 1px; }
+.cake-select-help { color: var(--lx-warm); font-size: .7rem; line-height: 1.35; }
+.cake-builder-total-bar { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 16px; padding: 14px 16px; border: 1px solid rgba(212,164,55,.5); border-radius: 14px; background: var(--lx-cream); }
+.cake-builder-total-bar > div { display: grid; gap: 4px; }
+.cake-builder-total-bar > div > span { color: var(--lx-warm); font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.cake-builder-total-bar > div > small { color: var(--lx-warm); font-size: .72rem; line-height: 1.35; }
+.cake-builder-total-bar > strong { color: var(--lx-brown); font-size: 1.35rem; white-space: nowrap; }
+@media (max-width: 560px) { .cake-builder-total-bar { align-items: flex-start; flex-direction: column; gap: 8px; } .cake-builder-total-bar > strong { font-size: 1.2rem; } }
+.cake-choice-select[multiple] { min-height: 46px; }
+.cake-builder-step .cake-choice-group + .cake-choice-group { margin-top: 10px; }
+.cake-builder-main .cake-tier-fields, .cake-builder-main .cake-overall-fields { gap: 10px; }
+.cake-simple-select-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.cake-simple-help { display: block; margin-top: 7px; color: var(--lx-warm); font-size: .72rem; line-height: 1.4; }
+@media (max-width: 560px) { .cake-simple-select-grid { grid-template-columns: 1fr; } }
+
+/* Shorter custom-cake flow: optional details stay tucked away until needed. */
+.cake-optional-step { margin-top: 14px; border-top: 1px dashed rgba(139,94,60,.3); }
+.cake-optional-step > summary { padding: 13px 0 3px; cursor: pointer; color: var(--lx-brown); font-size: .78rem; font-weight: 800; letter-spacing: .04em; list-style: none; }
+.cake-optional-step > summary::-webkit-details-marker { display: none; }
+.cake-optional-step > summary::after { content: '＋'; float: right; color: var(--lx-gold); font-size: 1rem; }
+.cake-optional-step[open] > summary::after { content: '−'; }
+.cake-optional-step > #cakeOverallConfig { margin-top: 9px; }
+
+/* Expanded custom-cake cart details, shown after the cake is added. */
+.cake-cart-spec { display: grid; gap: 2px; margin-top: 7px; padding: 7px 8px; border-left: 2px solid var(--lx-gold); border-radius: 7px; background: rgba(212,164,55,.08); color: var(--lx-warm); font-size: .68rem; line-height: 1.35; }
+.cake-cart-spec em { color: var(--lx-brown); font-style: normal; font-weight: 800; white-space: nowrap; }
+.cake-cart-spec-title { color: var(--lx-brown); font-size: .66rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.cake-cart-tier { margin-top: 4px; color: var(--lx-brown); font-size: .69rem; }
+.cake-cart-tier-total, .cake-cart-total { margin-top: 3px; padding-top: 3px; border-top: 1px dashed rgba(139,94,60,.25); color: var(--lx-brown); font-weight: 800; }
+.oli-n { min-width: 0; }
+
+/* Keep cake configuration inside the existing cart line, not as a second summary card. */
+.cake-cart-spec { display: block; margin-top: 5px; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.cake-cart-spec > span { display: block; }
+.cake-cart-spec-title { margin-bottom: 2px; font-size: .66rem; }
+.cake-cart-tier { margin-top: 4px; padding: 0; background: transparent; }
+.cake-cart-tier-total, .cake-cart-total { margin-top: 2px; padding-top: 2px; border-top: 0; }
+/* Cart is dark; keep every custom-cake detail high contrast. */
+.cart .cake-cart-spec { color: rgba(245,230,214,.88); }
+.cart .cake-cart-spec em { color: var(--lx-gold); }
+.cart .cake-cart-spec-title { color: var(--lx-pink); }
+.cart .cake-cart-tier { color: var(--lx-cream); }
+.cart .cake-cart-tier-total, .cart .cake-cart-total { color: var(--lx-cream); }
