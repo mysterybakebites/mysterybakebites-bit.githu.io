@@ -1470,7 +1470,6 @@ html.js .order-page .ocat.reveal {
 .cake-simple-select-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 760px) { .cake-simple-select-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .cake-simple-select-grid { grid-template-columns: 1fr; } }
-<<<<<<< HEAD
 
 /* =====================================================================
    Homepage relaunch — editorial bakery + practical learning
@@ -1841,7 +1840,6 @@ html.js .home-v2 .v2-hero-visual.visible { animation: v2HeroVisualIn .95s cubic-
 @media (prefers-reduced-motion: reduce) { .home-v2 .v2-review-rating { text-shadow: none; } }
 
 /* Readability polish for product prices, supporting copy, and review cards. */
-.home-v2 .v2-product-large { grid-row: auto; align-self: start; }
 .home-v2 .v2-product-info strong { padding-top: 11px; color: var(--brand-cream); font-size: .82rem; font-weight: 700; letter-spacing: .015em; }
 .home-v2 .v2-product-info strong i { font-size: 1.05rem; }
 .home-v2 .v2-product-info small { font-size: .64rem; }
@@ -1917,5 +1915,49 @@ html.js .home-v2 .v2-hero-visual.visible { animation: v2HeroVisualIn .95s cubic-
 .glass-page .subnav { border: 1px solid rgba(212,164,55,.27); background: rgba(58,31,15,.48); box-shadow: inset 0 1px 0 rgba(255,255,255,.06); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }.glass-page .subnav a { color: rgba(245,230,214,.78); }.glass-page .subnav a:hover, .glass-page .subnav a.active { color: var(--site-gold); }.glass-page .subnav .sn-book { border-color: var(--site-gold); background: rgba(212,164,55,.14); color: var(--site-cream); }
 .home-v2 .site-header .main-nav, .glass-page .site-header .main-nav { min-width: 0; }.home-v2 .site-header .nav5-inner, .glass-page .site-header .nav5-inner { gap: 12px; }
 @media (max-width: 760px) { .home-v2 .nav5 .header-wa, .glass-page .nav5 .header-wa { padding: 0 11px; }.home-v2 .v2-lede, .home-v2 .v2-section-intro > p:last-child, .home-v2 .v2-heading-aside p, .home-v2 .v2-class-head > p, .home-v2 .v2-custom-copy > p:not(.v2-overline), .home-v2 .v2-review-head > p:last-child { color: rgba(245,230,214,.9); } }
-=======
->>>>>>> 51f0f046e2bf648c76ee5f706b0f80538b955777
+
+/* =====================================================================
+   Balanced product grid — cards fill their rows with no leftover blank
+   space, and the four home products tile the grid without gaps.
+   ===================================================================== */
+.home-v2 .v2-product-image { flex: 1 0 auto; min-height: 0; }
+@media (min-width: 761px) {
+  .home-v2 .v2-product-wide:not(.v2-product-large) { grid-column: span 2; }
+  .home-v2 .v2-product-wide:not(.v2-product-large) .v2-product-image { aspect-ratio: 2.15; }
+}
+
+/* =====================================================================
+   Menu page readability — price-list items were keeping their light-theme
+   brown text on the dark glass cards; give them clear, on-brand contrast.
+   ===================================================================== */
+.glass-page .pl li { border-bottom-color: rgba(245,230,214,.16); }
+.glass-page .pl .item { color: var(--site-cream); }
+.glass-page .pl .item b, .glass-page .pl .item strong { color: var(--site-cream); }
+.glass-page .pl .price { color: var(--site-gold); }
+.glass-page .pl .dots { border-bottom-color: rgba(212,164,55,.4); }
+.glass-page .pl-body .note b { color: var(--site-cream); }
+.glass-page .cake-builder-menu-list li { color: rgba(245,230,214,.88); }
+.glass-page .cake-builder-menu-list li::before { color: var(--site-gold); }
+.glass-page .cake-builder-menu-note { color: rgba(245,230,214,.72); }
+
+/* =====================================================================
+   Navigation: "Custom Order" nested under "Order" in the mobile drawer.
+   ===================================================================== */
+.dr-order-sub { grid-template-columns: 1fr; margin: 2px 0 6px; padding-left: 14px; }
+.dr-order-sub .dr-lv { display: flex; align-items: center; gap: 10px; padding: 10px 12px; text-align: left; font-size: .82rem; }
+.dr-order-sub .dr-lv b { display: inline-block; font-size: 1rem; line-height: 1; }
+
+/* =====================================================================
+   Contact page — links and emphasis inside the glass info cards.
+   ===================================================================== */
+.glass-page .info-card p a { color: var(--site-gold); text-decoration: none; border-bottom: 1px solid rgba(212,164,55,.4); transition: color .2s, border-color .2s; }
+.glass-page .info-card p a:hover { color: var(--site-pink); border-bottom-color: var(--site-pink); }
+.glass-page .info-card p b { color: var(--site-cream); }
+.contact-methods .info-grid { align-items: stretch; }
+.contact-methods .info-card { height: 100%; }
+
+.footer .f-list .f-more { font-weight: 700; }
+.glass-page .footer .f-list a.f-more { color: var(--site-gold); }
+
+/* Keyboard access: reveal the Order submenu when the nav item has focus. */
+.nav5 .has-dd:focus-within .dd-panel { opacity: 1; visibility: visible; pointer-events: auto; transform: translate(-50%, 0); }
