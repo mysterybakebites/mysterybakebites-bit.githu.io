@@ -1470,6 +1470,7 @@ html.js .order-page .ocat.reveal {
 .cake-simple-select-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 760px) { .cake-simple-select-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .cake-simple-select-grid { grid-template-columns: 1fr; } }
+<<<<<<< HEAD
 
 /* =====================================================================
    Homepage relaunch — editorial bakery + practical learning
@@ -1916,3 +1917,5 @@ html.js .home-v2 .v2-hero-visual.visible { animation: v2HeroVisualIn .95s cubic-
 .glass-page .subnav { border: 1px solid rgba(212,164,55,.27); background: rgba(58,31,15,.48); box-shadow: inset 0 1px 0 rgba(255,255,255,.06); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }.glass-page .subnav a { color: rgba(245,230,214,.78); }.glass-page .subnav a:hover, .glass-page .subnav a.active { color: var(--site-gold); }.glass-page .subnav .sn-book { border-color: var(--site-gold); background: rgba(212,164,55,.14); color: var(--site-cream); }
 .home-v2 .site-header .main-nav, .glass-page .site-header .main-nav { min-width: 0; }.home-v2 .site-header .nav5-inner, .glass-page .site-header .nav5-inner { gap: 12px; }
 @media (max-width: 760px) { .home-v2 .nav5 .header-wa, .glass-page .nav5 .header-wa { padding: 0 11px; }.home-v2 .v2-lede, .home-v2 .v2-section-intro > p:last-child, .home-v2 .v2-heading-aside p, .home-v2 .v2-class-head > p, .home-v2 .v2-custom-copy > p:not(.v2-overline), .home-v2 .v2-review-head > p:last-child { color: rgba(245,230,214,.9); } }
+=======
+>>>>>>> 51f0f046e2bf648c76ee5f706b0f80538b955777
