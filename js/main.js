@@ -24,7 +24,7 @@ document.documentElement.classList.add('js');
 
   // current page highlight
   var page = location.pathname.split('/').pop() || 'index.html';
-  var key = page === 'menu.html' ? 'menu' : page === 'order.html' ? 'order' : (/^class/.test(page) || page === 'pastries.html') ? 'classes' : page === 'index.html' ? 'home' : null;
+  var key = page === 'menu.html' ? 'menu' : page === 'order.html' ? 'order' : page === 'contact.html' ? 'contact' : (/^class/.test(page) || page === 'pastries.html') ? 'classes' : page === 'index.html' ? 'home' : null;
   if (key) { var el = document.querySelector('.main-nav [data-key="' + key + '"]'); if (el) el.classList.add('current'); }
   document.querySelectorAll('.dr-main').forEach(function (a) { if (a.getAttribute('href') === page || (key === 'classes' && a.getAttribute('href') === 'classes.html')) a.classList.add('current'); });
   document.querySelectorAll('.dd-link').forEach(function (a) { if (a.getAttribute('href') === page) a.style.background = 'rgba(212,164,55,.14)'; });
@@ -285,7 +285,7 @@ document.querySelectorAll('.book-form').forEach(function (f) {
   var page = location.pathname.split('/').pop() || 'index.html';
   if (page !== 'index.html') return;
   var sequence = [
-    ['story', 'story'], ['menu', 'menu'], ['classes', 'classes'], ['custom', 'custom'],
+    ['story', 'story'], ['menu', 'menu'], ['classes', 'classes'], ['custom', 'order'],
     ['reviews', 'reviews'], ['gallery', 'gallery'], ['contact', 'contact']
   ];
   var links = document.querySelectorAll('.nav6 .main-nav [data-key]');
