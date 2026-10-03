@@ -327,58 +327,409 @@ document.querySelectorAll('.book-form').forEach(function (f) {
 
   var cakeBuilder = form.querySelector('.cake-builder');
   var cakeBuilderRow = cakeBuilder && cakeBuilder.querySelector('.cake-builder-line');
-  function optionLabel(opt) {
-    return opt ? opt.textContent.replace(/\s*·\s*(?:from\s*)?(?:\+\s*)?GH₵.*$/i, '').replace(/\s*·\s*(?:included|no extra).*$/i, '').trim() : '';
-  }
-  function syncCakeBuilder() {
-    if (!cakeBuilder || !cakeBuilderRow) return;
-    var type = cakeBuilder.querySelector('#cakeType'), base = cakeBuilder.querySelector('#cakeBase');
-    var flavour = cakeBuilder.querySelector('#cakeFlavour'), icing = cakeBuilder.querySelector('#cakeIcing');
-    var messageInput = cakeBuilder.querySelector('#cakeMessage'), themeInput = cakeBuilder.querySelector('#cakeTheme');
-    var typeOpt = type.options[type.selectedIndex], baseOpt = base.options[base.selectedIndex];
-    var flavourOpt = flavour.options[flavour.selectedIndex], icingOpt = icing.options[icing.selectedIndex];
-    var basePrice = parseFloat(baseOpt.dataset.price || '0');
-    var flavourPrice = parseFloat(flavourOpt.dataset.price || '0'), icingPrice = parseFloat(icingOpt.dataset.price || '0');
-    var addons = Array.prototype.slice.call(cakeBuilder.querySelectorAll('.cake-addon input:checked'));
-    var addonPrice = addons.reduce(function (sum, item) { return sum + parseFloat(item.dataset.price || '0'); }, 0);
-    var hasRange = !!(typeOpt.dataset.range || baseOpt.dataset.range || icingOpt.dataset.range || addons.some(function (x) { return x.dataset.range; }));
-    var total = basePrice + flavourPrice + icingPrice + addonPrice;
-    var typeLabel = optionLabel(typeOpt), baseLabel = baseOpt.value === 'choose' ? 'Choose a size / price basis' : optionLabel(baseOpt);
-    var addonLabels = addons.map(function (x) { return x.value; });
-    var customLabels = [];
-    if (messageInput && messageInput.value.trim()) customLabels.push('Message: ' + messageInput.value.trim().replace(/[·|]/g, ' '));
-    if (themeInput && themeInput.value.trim()) customLabels.push('Theme/reference: ' + themeInput.value.trim().replace(/[·|]/g, ' '));
-    var detailLabel = [typeLabel, baseLabel, optionLabel(flavourOpt) + ' flavour', optionLabel(icingOpt)].concat(addonLabels, customLabels).join(' · ');
-    cakeBuilderRow.dataset.name = 'Custom cake: ' + detailLabel;
-    cakeBuilderRow.dataset.price = total.toFixed(2);
-    cakeBuilderRow.querySelector('.oi-info b').textContent = 'Custom cake: ' + typeLabel;
-    cakeBuilderRow.querySelector('.oi-var').textContent = detailLabel;
-    cakeBuilderRow.querySelector('.oi-price').textContent = 'GH₵ ' + fmt(total) + (hasRange ? ' +' : '');
-    var totalLabel = cakeBuilder.querySelector('#cakeBuilderTotalLabel');
-    var totalOutput = cakeBuilder.querySelector('#cakeBuilderTotal');
-    var breakdown = cakeBuilder.querySelector('#cakeBuilderBreakdown');
-    var addButton = cakeBuilder.querySelector('#addCakeBuilder');
-    if (addButton) addButton.disabled = baseOpt.value === 'choose';
-    if (totalLabel) totalLabel.textContent = baseOpt.value === 'choose' ? 'Choose a base size' : (hasRange ? 'Starting total' : 'Estimated total');
-    if (totalOutput) totalOutput.textContent = 'GH₵ ' + fmt(total) + (hasRange ? ' +' : '');
-    if (breakdown) breakdown.textContent = 'Base: GH₵ ' + fmt(basePrice) + ' · Flavour: GH₵ ' + fmt(flavourPrice) + ' · Icing: GH₵ ' + fmt(icingPrice) + ' · Extras: GH₵ ' + fmt(addonPrice);
-    var typeHint = cakeBuilder.querySelector('#cakeTypeHint');
-    if (typeHint) typeHint.textContent = typeOpt.dataset.detail || 'Choose a cake type, then refine the size, finish and extras below.';
-  }
+  var cakeConfig = window.MB_CAKE_CONFIG || {};
+  var cakeState = { structureId: '', files: [] };
+  var cakeBuilderFiles = [];
+  var cakeBuilderFileUrls = [];
 
+  function cakeEscape(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+    });
+  }
+  function cakePriceText(item, base) {
+    if (!item || item.pricing_type === 'included' || item.price === 0) return 'Included';
+    if (item.pricing_type === 'custom_quote' || item.price == null) return 'Custom Quote';
+    var amount = 'GH₵ ' + fmt(item.price);
+    if (item.range) amount = 'from ' + amount;
+    return base ? amount : '+ ' + amount;
+  }
+  function cakeOptionBy(list, id) {
+    return (list || []).filter(function (item) { return item.id === id; })[0] || null;
+  }
+  function cakeStructureBy(id) { return cakeOptionBy(cakeConfig.structures, id); }
+  function cakeTierCount(id) {
+    if (id === 'one-layer' || id === 'one-tier') return 1;
+    if (id === 'two-tier') return 2;
+    if (id === 'three-tier') return 3;
+    if (id === 'four-tier') return 4;
+    return 0;
+  }
+  function cakeFieldName(prefix, key) { return prefix + '-' + key; }
+  function cakeRadioValue(name) {
+    var select = cakeBuilder && cakeBuilder.querySelector('select[name="' + name + '"]');
+    if (select) return select.value || '';
+    var input = cakeBuilder && cakeBuilder.querySelector('input[name="' + name + '"]:checked');
+    return input ? input.value : '';
+  }
+  function cakeCheckedValues(name) {
+    var select = cakeBuilder && cakeBuilder.querySelector('select[name="' + name + '"]');
+    if (select) return Array.prototype.slice.call(select.selectedOptions || []).map(function (option) { return option.value; }).filter(Boolean);
+    return Array.prototype.slice.call(cakeBuilder ? cakeBuilder.querySelectorAll('input[name="' + name + '"]:checked') : []).map(function (input) { return input.value; });
+  }
+  function cakeTierLabel(index, count) {
+    if (count === 1) return 'Cake configuration';
+    var labels = ['Bottom', 'Middle', 'Upper Middle', 'Top'];
+    if (count === 2) labels = ['Bottom', 'Top'];
+    if (count === 3) labels = ['Bottom', 'Middle', 'Top'];
+    return 'Tier ' + (index + 1) + ' — ' + labels[index];
+  }
+  function cakeOptionCards(list, name, mode, selected, group, required) {
+    var selectedValues = Array.isArray(selected) ? selected : [selected || ''];
+    var max = mode === 'multiple' ? (group === 'filling' ? cakeConfig.limits.fillings : group === 'decoration' ? cakeConfig.limits.decorations : group === 'topping' ? cakeConfig.limits.toppings : group === 'extras' ? cakeConfig.limits.extras : 10) : 1;
+    var placeholder = mode === 'multiple' ? 'Select up to ' + max + ' options' : 'Choose an option';
+    var options = (list || []).filter(function (item) { return item.active !== false; }).map(function (item) {
+      var selectedAttr = selectedValues.indexOf(item.id) > -1 ? ' selected' : '';
+      return '<option value="' + cakeEscape(item.id) + '"' + selectedAttr + '>' + cakeEscape(item.name) + ' · ' + cakeEscape(cakePriceText(item, group === 'size')) + '</option>';
+    }).join('');
+    var multiple = mode === 'multiple' ? ' multiple size="1"' : '';
+    var placeholderOption = mode === 'multiple' ? '' : '<option value="">' + cakeEscape(placeholder) + '</option>';
+    return '<fieldset class="cake-choice-group cake-choice-' + mode + '" data-builder-group="' + cakeEscape(group || name) + '" data-max="' + max + '">' +
+      '<legend>' + cakeEscape(name) + (required ? ' <i>Required</i>' : '') + '</legend>' +
+      '<select class="cake-choice-select" name="' + cakeEscape(name) + '" data-option-group="' + cakeEscape(group || name) + '"' + multiple + (required ? ' aria-required="true"' : '') + '>' + placeholderOption + options + '</select>' +
+      (mode === 'multiple' ? '<small class="cake-select-help">' + cakeEscape(placeholder) + '</small>' : '') + '</fieldset>';
+  }
+  function cakeSizeOptions(shape, tierIndex, previousSize) {
+    var allowed = (shape && cakeConfig.shapeSizes && cakeConfig.shapeSizes[shape]) || cakeConfig.sizeOrder || [];
+    var previousNumber = previousSize ? parseFloat(previousSize) : null;
+    if (tierIndex > 0 && previousNumber) allowed = allowed.filter(function (id) { return parseFloat(id) <= previousNumber; });
+    return (cakeConfig.sizes || []).filter(function (item) { return item.active !== false && allowed.indexOf(item.id) > -1; }).sort(function (a, b) { return (cakeConfig.sizeOrder || []).indexOf(a.id) - (cakeConfig.sizeOrder || []).indexOf(b.id); });
+  }
+  function cakeTierFieldMarkup(index, count, shape) {
+    var prefix = 'tier-' + index;
+    var previousSize = index === 1 ? cakeRadioValue('cake-global-size') : (index > 1 ? cakeRadioValue(cakeFieldName('tier-' + (index - 1), 'size')) : '');
+    var sizeList = cakeSizeOptions(shape, index, previousSize);
+    var selectedSize = index === 0 ? cakeRadioValue('cake-global-size') : cakeRadioValue(cakeFieldName(prefix, 'size'));
+    var selectedLayers = cakeRadioValue(cakeFieldName(prefix, 'layers'));
+    var selectedFlavour = cakeRadioValue(cakeFieldName(prefix, 'flavour'));
+    var selectedFilling = cakeRadioValue(cakeFieldName(prefix, 'filling'));
+    var selectedIcing = cakeRadioValue(cakeFieldName(prefix, 'icing'));
+    var fields = '';
+    if (index > 0) fields += cakeOptionCards(sizeList, cakeFieldName(prefix, 'size'), 'single', selectedSize, 'size-' + index, true);
+    if (count > 1 || cakeState.structureId === 'one-tier') fields += cakeOptionCards(cakeConfig.internalLayers, cakeFieldName(prefix, 'layers'), 'single', selectedLayers, 'layers', true);
+    fields += cakeOptionCards(cakeConfig.flavours, cakeFieldName(prefix, 'flavour'), 'single', selectedFlavour, 'flavour', true);
+    fields += cakeOptionCards(cakeConfig.fillings, cakeFieldName(prefix, 'filling'), 'single', selectedFilling, 'filling', false);
+    fields += cakeOptionCards(cakeConfig.icings, cakeFieldName(prefix, 'icing'), 'single', selectedIcing, 'icing', true);
+    return '<article class="cake-tier-card" data-tier-index="' + index + '"><header><div><span class="cake-tier-kicker">' + cakeEscape(count === 1 ? 'Cake configuration' : 'Tier ' + (index + 1)) + '</span><h4>' + cakeEscape(cakeTierLabel(index, count)) + '</h4></div><div class="cake-tier-head-actions"><strong data-tier-subtotal>GH₵ 0.00</strong><button type="button" class="cake-tier-edit" data-tier-edit="' + index + '">Edit</button></div></header><p class="cake-tier-help">' + cakeEscape(count === 1 ? 'Choose the cake details below. A layer is one cake layer; a tier is a separate stacked cake size.' : 'The next tier is filtered to a smaller or equal size so the stack remains valid.') + '</p><div class="cake-tier-fields">' + fields + '</div><p class="cake-inline-error" data-tier-error hidden></p></article>';
+  }
+  function cakeRenderStructureOptions() {
+    if (!cakeBuilder) return;
+    var target = cakeBuilder.querySelector('#cakeStructureOptions');
+    target.innerHTML = '<div class="cake-simple-select-grid"><label class="cake-structure-select-label"><span>Cake type <i>Required</i></span><select name="cake-structure" aria-required="true"><option value="">Choose a cake type</option>' + (cakeConfig.structures || []).map(function (item) {
+      return '<option value="' + cakeEscape(item.id) + '">' + cakeEscape(item.name) + '</option>';
+    }).join('') + '</select></label><label class="cake-structure-select-label"><span>Shape <i>Required</i></span><select name="cake-global-shape" aria-required="true"><option value="">Choose a shape</option>' + (cakeConfig.shapes || []).filter(function (item) { return item.active !== false; }).map(function (item) {
+      return '<option value="' + cakeEscape(item.id) + '">' + cakeEscape(item.name) + '</option>';
+    }).join('') + '</select></label><label class="cake-structure-select-label"><span>Size <i>Required</i></span><select name="cake-global-size" aria-required="true"><option value="">Choose a size</option></select></label></div><small class="cake-simple-help">For tiered cakes, this is the cake size for one cake or the bottom tier. Upper tiers are chosen smaller in the next step.</small>';
+    cakeRenderGlobalSizeOptions();
+  }
+  function cakeRenderGlobalSizeOptions() {
+    if (!cakeBuilder) return;
+    var select = cakeBuilder.querySelector('select[name="cake-global-size"]');
+    if (!select) return;
+    var shape = cakeRadioValue('cake-global-shape'), current = select.value;
+    var allowed = (shape && cakeConfig.shapeSizes && cakeConfig.shapeSizes[shape]) || cakeConfig.sizeOrder || [];
+    var options = (cakeConfig.sizes || []).filter(function (item) { return item.active !== false && allowed.indexOf(item.id) > -1; }).sort(function (a, b) { return (cakeConfig.sizeOrder || []).indexOf(a.id) - (cakeConfig.sizeOrder || []).indexOf(b.id); });
+    select.innerHTML = '<option value="">Choose a size</option>' + options.map(function (item) { return '<option value="' + cakeEscape(item.id) + '">' + cakeEscape(item.name) + ' · ' + cakeEscape(cakePriceText(item, true)) + '</option>'; }).join('');
+    if (options.some(function (item) { return item.id === current; })) select.value = current;
+  }
+  function cakeUploadMarkup() {
+    return '<div class="cake-upload-field"><label for="cakeInspirationImages">Inspiration images <small>Optional · up to ' + cakeConfig.limits.inspirationImages + ' JPG, PNG or WEBP files · ' + cakeConfig.limits.maxFileSizeMb + 'MB each</small></label><input id="cakeInspirationImages" type="file" accept="image/jpeg,image/png,image/webp" multiple><div class="cake-upload-list" id="cakeUploadList">No inspiration images added.</div><p class="cake-upload-help">Images are listed in your order request. Please also attach them in the WhatsApp chat so the baker can review them.</p></div>';
+  }
+  function cakeRenderOverall(count) {
+    var overall = cakeBuilder.querySelector('#cakeOverallConfig');
+    if (!overall) return;
+    var selectedDesign = cakeRadioValue('cake-design') || 'simple', selectedExtras = cakeCheckedValues('cake-extras'), selectedTopper = cakeRadioValue('cake-topper') || 'none', selectedColour = cakeRadioValue('cake-colour') || 'colour-0';
+    var extraOptions = (cakeConfig.decorations || []).concat(cakeConfig.toppings || []);
+    var html = '<div class="cake-overall-heading"><span class="cake-tier-kicker">Final touches</span><h4>Keep it simple</h4><p>Choose one design and any extras. The baker will confirm unusual requests.</p></div>';
+    html += '<div class="cake-overall-fields">';
+    html += cakeOptionCards(cakeConfig.designs, 'cake-design', 'single', selectedDesign, 'design', false);
+    html += cakeOptionCards(extraOptions, 'cake-extras', 'multiple', selectedExtras, 'extras', false);
+    html += cakeOptionCards(cakeConfig.toppers, 'cake-topper', 'single', selectedTopper, 'topper', false);
+    html += cakeOptionCards(cakeConfig.colours, 'cake-colour', 'single', selectedColour, 'colour', false);
+    html += '<label class="cake-custom-colour-field" data-custom-colour-for="global" hidden><span>Custom colour</span><input type="color" name="cake-custom-colour" value="#F7B7C8"><small>Use this only when Custom Colour is selected.</small></label>';
+    html += '<label class="cake-text-field"><span>Message or special request</span><input id="cakeOverallMessage" maxlength="120" type="text" placeholder="e.g. Happy Birthday Ama"><small>Use this for colours, themes or anything not covered above.</small></label>';
+    html += cakeUploadMarkup() + '</div>';
+    overall.innerHTML = html;
+    var msg = overall.querySelector('#cakeOverallMessage'); if (msg && cakeState.message) msg.value = cakeState.message;
+    cakeRenderUploadList();
+  }
+  function cakeRenderCustom() {
+    var custom = cakeBuilder.querySelector('#cakeCustomQuotePanel');
+    if (!custom) return;
+    custom.innerHTML = '<div class="cake-custom-quote"><span class="cake-tier-kicker">Baker review</span><h4>Custom cake brief</h4><p><b>Custom Quote Required.</b> Describe the unusual size, structure or design and the baker will confirm the final price before production.</p><label class="cake-text-field"><span>Describe your custom cake <i>Required</i></span><textarea id="cakeCustomDescription" maxlength="1000" rows="5" placeholder="Tell us what you need, including size, shape, servings or special construction."></textarea></label>' + cakeUploadMarkup() + '</div>';
+    var text = custom.querySelector('#cakeCustomDescription'); if (text && cakeState.customDescription) text.value = cakeState.customDescription;
+    cakeRenderUploadList();
+  }
+  function cakeRenderUploadList() {
+    var list = cakeBuilder && cakeBuilder.querySelector('#cakeUploadList');
+    if (!list) return;
+    cakeBuilderFileUrls.forEach(function (url) { try { URL.revokeObjectURL(url); } catch (ignore) {} });
+    cakeBuilderFileUrls = [];
+    if (!cakeBuilderFiles.length) { list.textContent = 'No inspiration images added.'; return; }
+    cakeBuilderFileUrls = cakeBuilderFiles.map(function (file) { return URL.createObjectURL(file); });
+    list.innerHTML = cakeBuilderFiles.map(function (file, i) { return '<span class="cake-upload-file"><img src="' + cakeBuilderFileUrls[i] + '" alt=""><b>' + (i + 1) + '</b><span>' + cakeEscape(file.name) + '</span></span>'; }).join('');
+  }
+  function cakeRenderConfig(id) {
+    var panel = cakeBuilder.querySelector('#cakeConfigPanel'), heading = cakeBuilder.querySelector('#cakeConfigHeading'), help = cakeBuilder.querySelector('#cakeConfigHelp'), tiers = cakeBuilder.querySelector('#cakeTierConfigs'), overall = cakeBuilder.querySelector('#cakeOverallConfig'), optional = cakeBuilder.querySelector('#cakeOptionalStep'), custom = cakeBuilder.querySelector('#cakeCustomQuotePanel');
+    if (!id) { panel.hidden = true; return; }
+    panel.hidden = false;
+    var count = cakeTierCount(id);
+    if (id === 'custom') {
+      heading.textContent = '2 · Tell us about your custom cake'; help.textContent = 'Keep it short: describe the unusual size, shape or design and the baker will prepare a quote.'; tiers.innerHTML = ''; if (optional) optional.hidden = true; overall.hidden = true; custom.hidden = false; cakeRenderCustom(); return;
+    }
+    heading.textContent = count === 1 && id === 'one-layer' ? '2 · Cake details' : '2 · Configure ' + count + (count === 1 ? ' tier' : ' tiers');
+    help.textContent = count === 1 && id === 'one-layer' ? 'One simple cake: choose the size, flavour and icing.' : 'Each tier only needs a size, internal layers, flavour and icing.';
+    custom.hidden = true; if (optional) { optional.hidden = false; optional.open = false; } overall.hidden = false;
+    var shape = cakeRadioValue('cake-global-shape') || '';
+    tiers.innerHTML = Array.apply(null, Array(count)).map(function (_, index) { return cakeTierFieldMarkup(index, count, shape); }).join('');
+    cakeRenderOverall(count);
+    cakeRefreshSizeConstraints();
+    cakeToggleCustomColours();
+  }
+  function cakeRenderUploadPreviews() {
+    var list = cakeBuilder && cakeBuilder.querySelector('#cakeUploadList');
+    if (!list || !cakeBuilderFiles.length) return;
+    cakeRenderUploadList();
+  }
+  function cakeRefreshSizeConstraints() {
+    if (!cakeBuilder) return;
+    var cards = Array.prototype.slice.call(cakeBuilder.querySelectorAll('.cake-tier-card'));
+    cards.forEach(function (card, index) {
+      if (index === 0) return;
+      var previous = index === 1 ? cakeRadioValue('cake-global-size') : cakeRadioValue(cakeFieldName('tier-' + (index - 1), 'size'));
+      var previousNumber = previous ? parseFloat(previous) : null;
+      var select = card.querySelector('select[data-option-group="size-' + index + '"]');
+      if (!select) return;
+      Array.prototype.forEach.call(select.options, function (option) {
+        if (!option.value) return;
+        var invalid = previousNumber == null || parseFloat(option.value) > previousNumber;
+        option.disabled = invalid;
+        if (invalid && option.selected) option.selected = false;
+      });
+    });
+  }
+  function cakeToggleCustomColours() {
+    if (!cakeBuilder) return;
+    var custom = cakeOptionBy(cakeConfig.colours, 'colour-9');
+    var customId = custom ? custom.id : '';
+    cakeBuilder.querySelectorAll('[data-custom-colour-for]').forEach(function (field) {
+      var prefix = field.dataset.customColourFor;
+      field.hidden = cakeRadioValue(prefix === 'global' ? 'cake-colour' : prefix + '-colour') !== customId;
+    });
+  }
+  function cakeHandleMultipleRules(select) {
+    var group = select.closest('[data-builder-group]'); if (!group || !select.matches('select[multiple]')) return;
+    var groupName = group.dataset.builderGroup;
+    var selected = Array.prototype.slice.call(select.selectedOptions || []);
+    if (groupName === 'filling') {
+      var none = Array.prototype.filter.call(select.options, function (option) { return option.value === 'none'; })[0];
+      if (none && none.selected) Array.prototype.forEach.call(select.options, function (option) { if (option !== none) option.selected = false; });
+      else if (none) none.selected = false;
+      selected = Array.prototype.slice.call(select.selectedOptions || []);
+    }
+    var max = parseInt(group.dataset.max, 10) || 10;
+    if (selected.length > max) {
+      selected.slice(max).forEach(function (option) { option.selected = false; });
+    }
+  }
+  function cakeApplyAll(key) {
+    var first = cakeRadioValue('tier-0-' + key); if (!first) return;
+    var count = cakeTierCount(cakeState.structureId);
+    for (var i = 1; i < count; i++) {
+      var select = cakeBuilder.querySelector('select[name="tier-' + i + '-' + key + '"]');
+      if (select && Array.prototype.some.call(select.options, function (option) { return option.value === first && !option.disabled; })) select.value = first;
+    }
+    cakeRefreshSizeConstraints(); cakeToggleCustomColours(); cakeSyncBuilder(); update();
+  }
+  function cakeHandleFiles(input) {
+    var files = Array.prototype.slice.call(input.files || []), max = cakeConfig.limits.inspirationImages, maxBytes = cakeConfig.limits.maxFileSizeMb * 1024 * 1024;
+    var accepted = files.filter(function (file) { return /image\/(jpeg|png|webp)/i.test(file.type) && file.size <= maxBytes; }).slice(0, max);
+    cakeBuilderFiles = accepted;
+    var warning = files.length > max ? ' Only the first ' + max + ' images are included.' : '';
+    if (accepted.length < files.length) warning += ' JPG, PNG or WEBP files must be under ' + cakeConfig.limits.maxFileSizeMb + 'MB.';
+    var help = cakeBuilder.querySelector('.cake-upload-help'); if (help && warning) help.textContent = warning.replace(/^ /, '');
+    cakeRenderUploadPreviews(); cakeSyncBuilder(); update();
+  }
+  function cakeReadTier(index, count) {
+    var prefix = 'tier-' + index, size = cakeOptionBy(cakeConfig.sizes, index === 0 ? cakeRadioValue('cake-global-size') : cakeRadioValue(cakeFieldName(prefix, 'size'))), layers = cakeOptionBy(cakeConfig.internalLayers, cakeRadioValue(cakeFieldName(prefix, 'layers'))), flavour = cakeOptionBy(cakeConfig.flavours, cakeRadioValue(cakeFieldName(prefix, 'flavour'))), icing = cakeOptionBy(cakeConfig.icings, cakeRadioValue(cakeFieldName(prefix, 'icing'))), colour = cakeOptionBy(cakeConfig.colours, cakeRadioValue('cake-colour')), customColourInput = cakeBuilder && cakeBuilder.querySelector('input[name="cake-custom-colour"]'), shape = cakeOptionBy(cakeConfig.shapes, cakeRadioValue('cake-global-shape')), fillings = cakeCheckedValues(cakeFieldName(prefix, 'filling')).map(function (id) { return cakeOptionBy(cakeConfig.fillings, id); }).filter(Boolean);
+    var total = 0, quote = false, lines = [];
+    function add(item, label, base) { if (!item) return; if (item.pricing_type === 'custom_quote' || item.price == null) { quote = true; lines.push(label + ': Custom Quote'); } else { total += Number(item.price || 0); if (item.price > 0) lines.push(label + ': ' + (base ? 'GH₵ ' : '+ GH₵ ') + fmt(item.price) + (item.range ? ' starting' : '')); } }
+    add(size, 'Size', true); add(layers, 'Internal layers', false); add(flavour, 'Flavour', false); fillings.forEach(function (item) { add(item, 'Filling', false); }); add(icing, 'Icing', false); add(colour, 'Colour', false); add(shape, 'Shape', false);
+    return { index: index, label: cakeTierLabel(index, count), size: size, layers: layers, flavour: flavour, shape: shape, fillings: fillings, icing: icing, colour: colour, customColour: customColourInput ? customColourInput.value : '', subtotal: total, quote: quote, lines: lines };
+  }
+  function cakeCalculate() {
+    var structure = cakeStructureBy(cakeState.structureId), count = cakeTierCount(cakeState.structureId), tiers = [], total = 0, quote = cakeState.structureId === 'custom', lines = [];
+    if (structure && count) tiers = Array.apply(null, Array(count)).map(function (_, index) { var tier = cakeReadTier(index, count); total += tier.subtotal; quote = quote || tier.quote; return tier; });
+    var design = cakeOptionBy(cakeConfig.designs, cakeRadioValue('cake-design')), extraOptions = (cakeConfig.decorations || []).concat(cakeConfig.toppings || []), extras = cakeCheckedValues('cake-extras').map(function (id) { return cakeOptionBy(extraOptions, id); }).filter(Boolean), decorations = extras.filter(function (item) { return item.category === 'decoration'; }), toppings = extras.filter(function (item) { return item.category === 'topping'; }), topper = cakeOptionBy(cakeConfig.toppers, cakeRadioValue('cake-topper') || 'none');
+    function addOverall(item, label) { if (!item) return; if (item.pricing_type === 'custom_quote' || item.price == null) { quote = true; lines.push(label + ': Custom Quote'); } else { total += Number(item.price || 0); if (item.price > 0) lines.push(label + ': +GH₵ ' + fmt(item.price) + (item.range ? ' starting' : '')); } }
+    if (design) addOverall(design, 'Design'); decorations.forEach(function (item) { addOverall(item, 'Decoration'); }); toppings.forEach(function (item) { addOverall(item, 'Topping'); }); addOverall(topper, 'Topper');
+    var assembly = cakeConfig.assembly[count]; if (assembly && count > 1) addOverall(assembly, 'Assembly / tiering');
+    var messageInput = cakeBuilder && cakeBuilder.querySelector('#cakeOverallMessage'), customInput = cakeBuilder && cakeBuilder.querySelector('#cakeCustomDescription');
+    var message = messageInput ? messageInput.value.trim() : '', customDescription = customInput ? customInput.value.trim() : '';
+    cakeState.message = message; cakeState.customDescription = customDescription; cakeState.files = cakeBuilderFiles.map(function (file) { return file.name; });
+    return { structure: structure, structureId: cakeState.structureId, tiers: tiers, design: design, decorations: decorations, toppings: toppings, topper: topper, assembly: assembly, message: message, customDescription: customDescription, files: cakeState.files, total: total, quote: quote, lines: lines };
+  }
+  function cakeSummaryText(spec) {
+    if (!spec.structure) return 'Choose a cake structure to begin.';
+    var html = '<div class="cake-summary-structure"><span>Structure</span><b>' + cakeEscape(spec.structure.name) + '</b></div>';
+    if (spec.structureId === 'custom') html += '<p>' + cakeEscape(spec.customDescription || 'Custom brief still needed.') + '</p>';
+    spec.tiers.forEach(function (tier) {
+      html += '<div class="cake-summary-tier"><b>' + cakeEscape(tier.label) + '</b><span>' + cakeEscape(tier.size ? tier.size.name : 'Size not selected') + (tier.flavour ? ' · ' + cakeEscape(tier.flavour.name) : '') + '</span><small>' + (tier.layers ? cakeEscape(tier.layers.name) + ' · ' : '') + (tier.fillings.length ? cakeEscape(tier.fillings.map(function (item) { return item.name; }).join(', ')) + ' · ' : '') + (tier.icing ? cakeEscape(tier.icing.name) : 'Icing not selected') + (tier.colour ? ' · ' + cakeEscape(tier.colour.name) : '') + (tier.customColour && tier.colour && tier.colour.name === 'Custom Colour' ? ' · ' + cakeEscape(tier.customColour) : '') + '</small><em>Subtotal: ' + (tier.quote ? 'Custom Quote' : 'GH₵ ' + fmt(tier.subtotal)) + '</em></div>';
+    });
+    if (spec.design || spec.decorations.length || spec.toppings.length || spec.topper || spec.message || spec.files.length) {
+      html += '<div class="cake-summary-extras"><b>Design & extras</b>';
+      if (spec.design) html += '<span>Design: ' + cakeEscape(spec.design.name) + '</span>';
+      if (spec.decorations.length) html += '<span>Decorations: ' + cakeEscape(spec.decorations.map(function (item) { return item.name; }).join(', ')) + '</span>';
+      if (spec.toppings.length) html += '<span>Toppings: ' + cakeEscape(spec.toppings.map(function (item) { return item.name; }).join(', ')) + '</span>';
+      if (spec.topper) html += '<span>Topper: ' + cakeEscape(spec.topper.name) + '</span>';
+      if (spec.message) html += '<span>Message: “' + cakeEscape(spec.message) + '”</span>';
+      if (spec.files.length) html += '<span>Inspiration images: ' + spec.files.length + ' attached file name' + (spec.files.length === 1 ? '' : 's') + '</span>';
+      html += '</div>';
+    }
+    return html;
+  }
+  function cakeCartDetails(spec) {
+    if (!spec || !spec.structure) return '';
+    var html = '<span class="cake-cart-spec"><span class="cake-cart-spec-title">Details:</span>';
+    if (spec.structureId === 'custom') {
+      html += '<span>Custom brief: ' + cakeEscape(spec.customDescription || 'Awaiting details') + '</span>';
+    }
+    spec.tiers.forEach(function (tier) {
+      html += '<span class="cake-cart-tier"><b>' + cakeEscape(tier.label) + '</b></span>';
+      if (tier.shape) html += '<span>Shape: ' + cakeEscape(tier.shape.name) + ' <em>' + cakePriceText(tier.shape, false) + '</em></span>';
+      if (tier.size) html += '<span>Size: ' + cakeEscape(tier.size.name) + ' <em>' + cakePriceText(tier.size, true) + '</em></span>';
+      if (tier.layers) html += '<span>Layers: ' + cakeEscape(tier.layers.name) + ' <em>' + cakePriceText(tier.layers, false) + '</em></span>';
+      if (tier.flavour) html += '<span>Flavour: ' + cakeEscape(tier.flavour.name) + ' <em>' + cakePriceText(tier.flavour, false) + '</em></span>';
+      if (tier.fillings.length) tier.fillings.forEach(function (item) { html += '<span>Filling: ' + cakeEscape(item.name) + ' <em>' + cakePriceText(item, false) + '</em></span>'; });
+      if (tier.icing) html += '<span>Icing: ' + cakeEscape(tier.icing.name) + ' <em>' + cakePriceText(tier.icing, false) + '</em></span>';
+      if (tier.colour) html += '<span>Colour: ' + cakeEscape(tier.colour.name) + ' <em>' + cakePriceText(tier.colour, false) + '</em></span>';
+      if (tier.customColour && tier.colour && tier.colour.name === 'Custom Colour') html += '<span>Custom colour: ' + cakeEscape(tier.customColour) + ' <em>Included</em></span>';
+      html += '<span class="cake-cart-tier-total">Tier subtotal: <em>' + (tier.quote ? 'Custom Quote' : 'GH₵ ' + fmt(tier.subtotal)) + '</em></span>';
+    });
+    if (spec.design) html += '<span>Design: ' + cakeEscape(spec.design.name) + ' <em>' + cakePriceText(spec.design, false) + '</em></span>';
+    spec.decorations.forEach(function (item) { html += '<span>Extra: ' + cakeEscape(item.name) + ' <em>' + cakePriceText(item, false) + '</em></span>'; });
+    spec.toppings.forEach(function (item) { html += '<span>Extra: ' + cakeEscape(item.name) + ' <em>' + cakePriceText(item, false) + '</em></span>'; });
+    if (spec.topper) html += '<span>Topper: ' + cakeEscape(spec.topper.name) + ' <em>' + cakePriceText(spec.topper, false) + '</em></span>';
+    if (spec.message) html += '<span>Message: “' + cakeEscape(spec.message) + '” <em>Included</em></span>';
+    if (spec.files.length) html += '<span>Inspiration images: ' + spec.files.length + ' <em>Included</em></span>';
+    if (spec.assembly && spec.tiers.length > 1) html += '<span>Assembly: ' + cakeEscape(spec.assembly.name) + ' <em>' + cakePriceText(spec.assembly, false) + '</em></span>';
+    html += '</span>';
+    return html;
+  }
+  function cakeSpecMessage(spec) {
+    if (!spec || !spec.structure) return '';
+    var lines = ['CUSTOM CAKE SPECIFICATION', 'Structure: ' + spec.structure.name];
+    if (spec.structureId === 'custom') lines.push('Custom brief: ' + (spec.customDescription || 'Not provided'));
+    spec.tiers.forEach(function (tier) {
+      lines.push('', tier.label);
+      lines.push('Size: ' + (tier.size ? tier.size.name : 'Not selected'));
+      if (tier.shape) lines.push('Shape: ' + tier.shape.name);
+      if (tier.layers) lines.push('Internal layers: ' + tier.layers.name);
+      lines.push('Flavour: ' + (tier.flavour ? tier.flavour.name : 'Not selected'));
+      lines.push('Filling: ' + (tier.fillings.length ? tier.fillings.map(function (item) { return item.name; }).join(', ') : 'No Filling'));
+      lines.push('Icing: ' + (tier.icing ? tier.icing.name : 'Not selected'));
+      lines.push('Colour: ' + (tier.colour ? tier.colour.name : 'Not selected') + (tier.customColour && tier.colour && tier.colour.name === 'Custom Colour' ? ' (' + tier.customColour + ')' : ''));
+      lines.push('Tier subtotal: ' + (tier.quote ? 'Custom Quote' : 'GH₵ ' + fmt(tier.subtotal)));
+    });
+    if (spec.design) lines.push('', 'Design: ' + spec.design.name);
+    if (spec.decorations.length) lines.push('Decorations: ' + spec.decorations.map(function (item) { return item.name; }).join(', '));
+    if (spec.toppings.length) lines.push('Toppings: ' + spec.toppings.map(function (item) { return item.name; }).join(', '));
+    if (spec.topper) lines.push('Cake topper: ' + spec.topper.name);
+    if (spec.message) lines.push('Cake message: "' + spec.message + '"');
+    if (spec.files.length) lines.push('Inspiration images to attach: ' + spec.files.join(', '));
+    lines.push('', spec.quote ? 'Status: AWAITING BAKER REVIEW / CUSTOM QUOTE' : 'Status: ESTIMATE AWAITING BAKER CONFIRMATION', 'Estimated cake total: ' + (spec.quote ? 'GH₵ ' + fmt(spec.total) + ' + custom quote items' : 'GH₵ ' + fmt(spec.total)));
+    return lines.join('\n');
+  }
+  function cakeUpdateProgress(step) {
+    if (!cakeBuilder) return;
+    cakeBuilder.querySelectorAll('#cakeProgress li').forEach(function (item, index) { item.classList.toggle('is-active', index + 1 === step); item.classList.toggle('is-done', index + 1 < step); });
+  }
+  function cakeSyncBuilder() {
+    if (!cakeBuilder || !cakeBuilderRow) return;
+    var spec = cakeCalculate();
+    var shortName = spec.structure ? spec.structure.name : 'Customized cake';
+    cakeBuilderRow.dataset.name = 'Custom cake: ' + shortName + (spec.quote ? ' · Awaiting baker quote' : '');
+    cakeBuilderRow.dataset.price = Number(spec.total || 0).toFixed(2);
+    cakeBuilderRow.dataset.cakeSpec = JSON.stringify(spec);
+    var info = cakeBuilderRow.querySelector('.oi-info b'), variant = cakeBuilderRow.querySelector('.oi-var'), price = cakeBuilderRow.querySelector('.oi-price');
+    if (info) info.textContent = 'Custom cake: ' + shortName;
+    if (variant) variant.textContent = spec.structure ? (spec.tiers.length ? spec.tiers.length + (spec.tiers.length === 1 ? ' configuration' : ' tiers') + (spec.message ? ' · message added' : '') : 'Custom brief') : 'Choose your cake details above';
+    if (price) price.textContent = spec.quote ? 'GH₵ ' + fmt(spec.total) + ' + review' : 'GH₵ ' + fmt(spec.total);
+    var totalLabel = cakeBuilder.querySelector('#cakeBuilderTotalLabel'), total = cakeBuilder.querySelector('#cakeBuilderTotal'), summary = cakeBuilder.querySelector('#cakeBuilderSummary'), review = cakeBuilder.querySelector('#cakeBuilderReviewNote'), add = cakeBuilder.querySelector('#addCakeBuilder');
+    if (totalLabel) totalLabel.textContent = spec.quote ? 'Estimate + baker review' : 'Estimated cake total';
+    if (total) total.textContent = 'GH₵ ' + fmt(spec.total || 0) + (spec.quote ? ' +' : '');
+    if (summary) summary.innerHTML = cakeSummaryText(spec);
+    cakeBuilder.querySelectorAll('.cake-tier-card').forEach(function (card, index) {
+      var tierTotal = card.querySelector('[data-tier-subtotal]'), tier = spec.tiers[index];
+      if (tierTotal && tier) tierTotal.textContent = tier.quote ? 'GH₵ ' + fmt(tier.subtotal) + ' + review' : 'GH₵ ' + fmt(tier.subtotal);
+    });
+    if (review) review.textContent = spec.quote ? 'Custom Quote Required. The baker will review the full specification before confirming the final price.' : 'Your final design and price are confirmed by the baker before production.';
+    if (add) add.disabled = !spec.structure;
+    var addedQuantity = cakeBuilder.querySelector('.cake-builder-line') ? (parseInt(cakeBuilderRow.querySelector('input').value, 10) || 0) : 0;
+    cakeUpdateProgress(spec.structure ? (addedQuantity > 0 ? 3 : 2) : 1);
+  }
+  function cakeValidation() {
+    var spec = cakeCalculate(), errors = [];
+    if (!spec.structure) errors.push('Please choose a cake structure first.');
+    if (spec.structureId === 'custom') { if (!spec.customDescription) errors.push('Please describe your custom cake so the baker can prepare a quote.'); }
+    else {
+      if (!cakeRadioValue('cake-global-shape')) errors.push('Please select a cake shape.');
+      if (!cakeRadioValue('cake-global-size')) errors.push('Please select a cake size.');
+      spec.tiers.forEach(function (tier, index) {
+        if (index > 0 && !tier.size) errors.push('Please select a smaller size for ' + tier.label + '.');
+        if (!tier.layers && (spec.structureId !== 'one-layer')) errors.push('Please select the number of internal layers for ' + tier.label + '.');
+        if (!tier.flavour) errors.push('Please select a flavour for ' + tier.label + '.');
+        if (!tier.icing) errors.push('Please select an icing for ' + tier.label + '.');
+        if (!tier.colour) errors.push('Please select an icing colour for ' + tier.label + '.');
+        if (tier.fillings.length > cakeConfig.limits.fillings) errors.push(tier.label + ' can have a maximum of ' + cakeConfig.limits.fillings + ' fillings.');
+      });
+      // Design, topper and extras are optional; simple defaults keep the order quick.
+    }
+    if (cakeBuilderFiles.length > cakeConfig.limits.inspirationImages) errors.push('Please select no more than ' + cakeConfig.limits.inspirationImages + ' inspiration images.');
+    return { spec: spec, errors: errors };
+  }
+  function cakeShowErrors(errors) {
+    var box = cakeBuilder && cakeBuilder.querySelector('#cakeBuilderValidation');
+    if (!box) return;
+    box.hidden = !errors.length; box.innerHTML = errors.length ? '<b>Please complete the cake builder:</b><ul>' + errors.map(function (error) { return '<li>' + cakeEscape(error) + '</li>'; }).join('') + '</ul>' : '';
+    if (errors.length) box.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' });
+  }
+  if (cakeBuilder) {
+    cakeRenderStructureOptions();
+    var validation = document.createElement('div'); validation.id = 'cakeBuilderValidation'; validation.className = 'cake-builder-validation'; validation.hidden = true; cakeBuilder.querySelector('.cake-builder-main').appendChild(validation);
+    cakeBuilder.querySelector('#cakeStructureOptions').addEventListener('change', function (event) {
+      if (event.target.name === 'cake-structure') {
+        cakeState.structureId = event.target.value; cakeState.message = ''; cakeState.customDescription = ''; cakeBuilderFiles = []; cakeRenderConfig(cakeState.structureId);
+        var panel = cakeBuilder.querySelector('#cakeConfigPanel'); if (panel) setTimeout(function () { panel.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' }); }, 80);
+      } else if (event.target.name === 'cake-global-shape') {
+        cakeRenderGlobalSizeOptions();
+        if (cakeState.structureId) cakeRenderConfig(cakeState.structureId);
+      } else if (event.target.name === 'cake-global-size' && cakeState.structureId) {
+        cakeRenderConfig(cakeState.structureId);
+      }
+      cakeToggleCustomColours(); cakeSyncBuilder();
+    });
+    cakeBuilder.addEventListener('change', function (event) {
+      var input = event.target;
+      if (input.id === 'cakeInspirationImages') { cakeHandleFiles(input); return; }
+      if (input.matches('select[multiple]')) cakeHandleMultipleRules(input);
+      if (input.name && input.name.indexOf('-size') > -1) cakeRefreshSizeConstraints();
+      cakeToggleCustomColours();
+      cakeSyncBuilder(); update();
+    });
+    cakeBuilder.addEventListener('input', function (event) { if (event.target.matches('textarea, #cakeOverallMessage')) { cakeSyncBuilder(); update(); } });
+    cakeBuilder.addEventListener('click', function (event) {
+      var apply = event.target.closest('[data-apply-all]'); if (apply) { cakeApplyAll(apply.dataset.applyAll); return; }
+      var edit = event.target.closest('[data-tier-edit]'); if (edit) { var card = cakeBuilder.querySelector('.cake-tier-card[data-tier-index="' + edit.dataset.tierEdit + '"]'); if (card) { card.classList.remove('is-collapsed'); card.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' }); } return; }
+    });
+    var addCakeButton = cakeBuilder.querySelector('#addCakeBuilder');
+    if (addCakeButton) addCakeButton.addEventListener('click', function () { var result = cakeValidation(); cakeShowErrors(result.errors); if (result.errors.length) return; cakeBuilderRow.querySelector('input').value = 1; cakeSyncBuilder(); update(); cakeBuilderRow.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' }); });
+  }
   rows.forEach(function (r) {
     r.querySelector('.q-plus').addEventListener('click', function () { set(r, qtyOf(r) + 1); });
     r.querySelector('.q-minus').addEventListener('click', function () { set(r, qtyOf(r) - 1); });
     r.querySelector('input').addEventListener('input', update);
   });
-  if (cakeBuilder) {
-    cakeBuilder.querySelectorAll('select, .cake-addon input, #cakeMessage, #cakeTheme').forEach(function (control) {
-      control.addEventListener('change', function () { syncCakeBuilder(); update(); });
-      if (control.matches('#cakeMessage, #cakeTheme')) control.addEventListener('input', function () { syncCakeBuilder(); update(); });
-    });
-    var addCakeButton = cakeBuilder.querySelector('#addCakeBuilder');
-    if (addCakeButton) addCakeButton.addEventListener('click', function () { syncCakeBuilder(); cakeBuilderRow.querySelector('input').value = 1; update(); });
-  }
 
   // preselect from ?add=id and open #cat-
   var add = new URLSearchParams(location.search).get('add');
@@ -393,13 +744,15 @@ document.querySelectorAll('.book-form').forEach(function (f) {
 
   function chosen() { return rows.filter(function (r) { return qtyOf(r) > 0; }); }
   function update() {
-    syncCakeBuilder();
+    cakeSyncBuilder();
     var items = chosen(), sub = 0, n = 0;
     list.innerHTML = '';
     items.forEach(function (r) {
       var qn = qtyOf(r), line = qn * parseFloat(r.dataset.price); sub += line; n += qn;
       var li = document.createElement('li');
-      li.innerHTML = '<span class="oli-q">' + qn + '×</span><span class="oli-n">' + r.dataset.name + '<small>' + r.dataset.cat + '</small></span><span class="oli-p">GH₵ ' + fmt(line) + '</span><button type="button" class="oli-x" aria-label="Remove">×</button>';
+      var cakeDetails = '';
+      if (r.dataset.cakeSpec) { try { cakeDetails = cakeCartDetails(JSON.parse(r.dataset.cakeSpec)); } catch (ignore) {} }
+      li.innerHTML = '<span class="oli-q">' + qn + '×</span><span class="oli-n">' + r.dataset.name + '<small>' + r.dataset.cat + '</small>' + cakeDetails + '</span><span class="oli-p">GH₵ ' + fmt(line) + '</span><button type="button" class="oli-x" aria-label="Remove">×</button>';
       li.querySelector('.oli-x').addEventListener('click', function () { set(r, 0); });
       list.appendChild(li);
     });
@@ -440,7 +793,7 @@ document.querySelectorAll('.book-form').forEach(function (f) {
   function makeReceipt(data) {
     var logo = data.logo ? '<img class="receipt-logo" src="' + data.logo + '" alt="Mystery Bakebite logo">' : '';
     var rows = data.items.map(function (it) {
-      return '<tr><td><b>' + escReceipt(it.name) + '</b><small>' + escReceipt(it.category) + '</small></td><td>' + it.qty + '</td><td>GH₵ ' + fmt(it.unit) + '</td><td>GH₵ ' + fmt(it.line) + '</td></tr>';
+      return '<tr><td><b>' + escReceipt(it.name) + '</b><small>' + escReceipt(it.category) + '</small>' + (it.details ? '<small class="receipt-details">' + escReceipt(it.details).replace(/\n/g, '<br>') + '</small>' : '') + '</td><td>' + it.qty + '</td><td>GH₵ ' + fmt(it.unit) + '</td><td>GH₵ ' + fmt(it.line) + '</td></tr>';
     }).join('');
     var delivery = data.delivery ? '<div class="sum-row"><span>Delivery fee</span><b>Confirmed on WhatsApp</b></div>' : '<div class="sum-row"><span>Pickup</span><b>Free</b></div>';
     var notes = data.notes ? '<section class="receipt-info"><h3>Order notes</h3><p>' + escReceipt(data.notes).replace(/\n/g, '<br>') + '</p></section>' : '';
@@ -448,7 +801,7 @@ document.querySelectorAll('.book-form').forEach(function (f) {
       ' :root{--brown:#3A1F0F;--gold:#D4A437;--pink:#F7B7C8;--cream:#F5E6D6;--warm:#8B5E3C}*{box-sizing:border-box}body{width:80mm;max-width:100vw;margin:0 auto;padding:0;background:#fff;color:var(--brown);font:11px/1.45 Georgia,serif}.receipt{width:80mm;max-width:100%;margin:0 auto;padding:4mm;background:#fff;color:var(--brown);border:0;border-radius:0;box-shadow:none}.brand{display:flex;flex-direction:column;align-items:center;gap:2mm;padding-bottom:3mm;border-bottom:1px dashed rgba(139,94,60,.45);text-align:center}.receipt-logo{display:block;width:36mm;height:36mm;max-width:100%;object-fit:contain;border:0;border-radius:0;background:transparent}.eyebrow{color:var(--warm);font-size:8px;font-weight:bold;letter-spacing:.16em;text-transform:uppercase}.brand h1{margin:1mm 0 0;font-size:15px;line-height:1.15;color:var(--brown)}.slogan{margin:1mm 0 0;color:var(--warm);font-size:9px;font-style:italic}.title{display:flex;align-items:flex-start;flex-direction:column;gap:2mm;margin:4mm 0}.title h2{margin:0;font-size:16px;line-height:1.2}.title p{margin:1mm 0 0;color:var(--warm);font-size:9px}.status{display:inline-block;padding:1.5mm 2mm;border:1px solid var(--gold);border-radius:99px;color:var(--brown);background:rgba(212,164,55,.14);font-size:7px;font-weight:bold;letter-spacing:.08em;text-align:center}.table-wrap{width:100%;overflow:visible}table{width:100%;table-layout:fixed;border-collapse:collapse}th{padding:1.5mm .8mm;text-align:left;color:var(--warm);font-size:7px;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--gold)}td{padding:2mm .8mm;border-bottom:1px dashed rgba(139,94,60,.26);vertical-align:top;font-size:8px;overflow-wrap:anywhere}td small{display:block;color:var(--warm);font-size:7px}th:nth-child(1),td:nth-child(1){width:39%}th:nth-child(2),td:nth-child(2){width:9%}th:nth-child(3),td:nth-child(3){width:25%}th:nth-child(4),td:nth-child(4){width:27%}td:nth-child(n+2),th:nth-child(n+2){text-align:right;white-space:nowrap}.summary{width:100%;max-width:none;margin:4mm 0 0;padding:2mm;border:1px solid rgba(212,164,55,.5);border-radius:2mm;background:#fff}.sum-row{display:flex;justify-content:space-between;gap:2mm;padding:1mm 0;color:var(--warm);font-size:8px}.sum-total{display:flex;justify-content:space-between;gap:2mm;padding-top:2mm;margin-top:1mm;border-top:1px solid var(--gold);font-weight:bold;color:var(--brown);font-size:11px}.sum-total b{color:var(--brown)}.receipt-info{margin-top:3mm;padding-top:2mm;border-top:1px dashed rgba(139,94,60,.3)}.receipt-info h3{margin:0 0 1mm;font-size:9px}.receipt-info p{margin:0;color:var(--warm);font-size:8px}.notice{margin:3mm 0 0;padding:2mm;border-left:2px solid var(--gold);background:rgba(212,164,55,.08);color:var(--warm);font-size:8px}.contact{margin-top:3mm;color:var(--warm);font-size:7px;text-align:center;overflow-wrap:anywhere}.actions{margin-top:4mm;display:flex;justify-content:center;gap:2mm;flex-wrap:wrap}.actions button{border:0;border-radius:99px;padding:2mm 3mm;background:var(--brown);color:var(--cream);font:inherit;font-size:9px;font-weight:bold;cursor:pointer}.actions button:hover{background:var(--warm)}@media(max-width:340px){body,.receipt{width:100vw}}@page{size:80mm 250mm;margin:0}@media print{html,body{width:80mm;min-width:80mm;max-width:80mm;margin:0;padding:0;background:#fff}.receipt{width:80mm;max-width:80mm;margin:0;padding:4mm 4mm 6mm;border:0;border-radius:0;box-shadow:none}.actions{display:none}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}' +
       '</style></head><body><main class="receipt"><header class="brand">' + logo + '<div><span class="eyebrow">Tamale, Ghana</span><h1>Mystery Bakebite</h1><p class="slogan">Unveiling The Uniqueness of A Recipe</p></div></header>' +
       '<section class="title"><div><h2>Order request receipt</h2><p>Prepared ' + escReceipt(data.created) + '</p></div><span class="status">AWAITING WHATSAPP CONFIRMATION</span></section>' +
-      '<section class="receipt-info"><h3>Customer</h3><p><b>' + escReceipt(data.name) + '</b><br>' + escReceipt(data.phone) + '</p></section>' +
+      '<section class="receipt-info"><h3>Customer</h3><p><b>' + escReceipt(data.name) + '</b><br>' + escReceipt(data.phone) + (data.email ? '<br>' + escReceipt(data.email) : '') + '</p></section>' +
       '<section class="receipt-info"><h3>Order details</h3><p>' + escReceipt(data.fulfilment) + ' on ' + escReceipt(data.date) + ' at ' + escReceipt(data.time) + (data.delivery && data.area ? '<br>Delivery area: ' + escReceipt(data.area) : '') + '</p></section>' +
       '<div class="table-wrap"><table><thead><tr><th>Item</th><th>Qty</th><th>Unit price</th><th>Line total</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
       '<section class="summary"><div class="sum-row"><span>Subtotal</span><b>GH₵ ' + fmt(data.subtotal) + '</b></div>' + delivery + '<div class="sum-row"><span>Payment</span><b>' + escReceipt(data.payment) + '</b></div><div class="sum-total"><span>Estimated total</span><b>GH₵ ' + fmt(data.subtotal) + (data.delivery ? ' + delivery' : '') + '</b></div></section>' +
@@ -479,7 +832,11 @@ document.querySelectorAll('.book-form').forEach(function (f) {
     if (s.deliv && !g('area')) return fail('Please enter your delivery area or landmark.', form.querySelector('[name=area]'));
     if (!g('name')) return fail('Please enter your name.', form.querySelector('[name=name]'));
     if (!g('phone')) return fail('Please enter your phone number.', form.querySelector('[name=phone]'));
-    var lines = s.items.map(function (r) { var qn = qtyOf(r); return '• ' + qn + ' × ' + r.dataset.name + ' (' + r.dataset.cat + ') = GH₵ ' + fmt(qn * parseFloat(r.dataset.price)); }).join('\n');
+    var lines = s.items.map(function (r) {
+      var qn = qtyOf(r), line = '• ' + qn + ' × ' + r.dataset.name + ' (' + r.dataset.cat + ') = GH₵ ' + fmt(qn * parseFloat(r.dataset.price));
+      if (r.dataset.cakeSpec) { try { line += '\n' + cakeSpecMessage(JSON.parse(r.dataset.cakeSpec)); } catch (ignore) {} }
+      return line;
+    }).join('\n');
     var tp = form.querySelector('.topping:not([hidden]) select');
     var momo = s.pay.indexOf('Mobile Money') > -1;
     var net = form.querySelector('[name=net]:checked');
@@ -490,17 +847,19 @@ document.querySelectorAll('.book-form').forEach(function (f) {
       '*' + (s.deliv ? 'DELIVERY' : 'PICKUP') + '*\n' +
       'Date: ' + d + '\nTime: ' + g('time') + '\n' + (s.deliv ? 'Area: ' + g('area') + '\n' : '') + '\n' +
       '*PAYMENT*\n' + (momo ? 'Full payment upfront via Mobile Money (' + (net ? net.value : '') + '). Please send your MoMo details.' : 'Cash on ' + (s.deliv ? 'delivery' : 'pickup')) + '\n\n' +
-      '*CUSTOMER*\nName: ' + g('name') + '\nPhone: ' + g('phone') + (g('notes') ? '\nNotes: ' + g('notes') : '');
+      '*CUSTOMER*\nName: ' + g('name') + '\nPhone: ' + g('phone') + (g('email') ? '\nEmail: ' + g('email') : '') + (g('notes') ? '\nNotes: ' + g('notes') : '');
     var now = new Date();
     var orderItems = s.items.map(function (r) {
       var quantity = qtyOf(r), unit = parseFloat(r.dataset.price);
       var topping = tp && r.dataset.cat === 'Cake Loaves' ? ' (Topping: ' + tp.value + ')' : '';
-      return { name: r.dataset.name + topping, category: r.dataset.cat, qty: quantity, unit: unit, line: quantity * unit };
+      var details = '';
+      if (r.dataset.cakeSpec) { try { details = cakeSpecMessage(JSON.parse(r.dataset.cakeSpec)); } catch (ignore) {} }
+      return { name: r.dataset.name + topping, category: r.dataset.cat, qty: quantity, unit: unit, line: quantity * unit, details: details };
     });
     receiptFileStamp = now.toISOString().slice(0, 16).replace(/[T:]/g, '-');
     receiptMarkup = makeReceipt({
       logo: logoDataUrl(), created: now.toLocaleString('en-GH', { dateStyle: 'medium', timeStyle: 'short' }),
-      name: g('name'), phone: g('phone'), fulfilment: s.deliv ? 'Delivery' : 'Pickup', date: d,
+      name: g('name'), phone: g('phone'), email: g('email'), fulfilment: s.deliv ? 'Delivery' : 'Pickup', date: d,
       time: g('time'), delivery: s.deliv, area: g('area'), subtotal: s.sub,
       payment: momo ? 'Mobile Money, ' + (net ? net.value : '') + ', full payment upfront' : 'Cash on ' + (s.deliv ? 'delivery' : 'pickup'),
       notes: g('notes'), items: orderItems
@@ -601,4 +960,29 @@ document.querySelectorAll('.book-form').forEach(function (f) {
   addEventListener('scroll', onScroll, { passive: true });
   addEventListener('resize', onScroll);
   update();
+})();
+
+// Homepage sample-review carousel: duplicate the review set for a seamless
+// left-to-right loop, while pausing whenever a keyboard or pointer user is
+// interacting with the carousel.
+(function () {
+  var viewport = document.querySelector('.v2-review-viewport');
+  var track = viewport && viewport.querySelector('.v2-review-list');
+  if (!viewport || !track || track.dataset.carouselReady) return;
+  track.dataset.carouselReady = 'true';
+  var cards = Array.prototype.slice.call(track.children);
+  cards.forEach(function (card) { track.appendChild(card.cloneNode(true)); });
+  track.style.setProperty('--review-duration', Math.max(78, cards.length * 2.8) + 's');
+  function pause() { track.classList.add('is-paused'); }
+  function resume() { track.classList.remove('is-paused'); }
+  viewport.addEventListener('mouseenter', pause);
+  viewport.addEventListener('mouseleave', resume);
+  viewport.addEventListener('focusin', pause);
+  viewport.addEventListener('focusout', function (event) {
+    if (!viewport.contains(event.relatedTarget)) resume();
+  });
+  if (reduce) {
+    viewport.classList.add('reduced-motion');
+    pause();
+  }
 })();
